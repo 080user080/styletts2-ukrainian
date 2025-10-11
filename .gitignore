@@ -27,3 +27,6 @@ output_audio/
 old/
 output_audio/
 Кирило Булкін/
+
+!voices/
+!voices/*.pt
