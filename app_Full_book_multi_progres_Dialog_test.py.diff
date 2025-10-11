@@ -1,0 +1,54 @@
+---/"app_Full_book_multi_progres_Dialog_test.py"
++++/"app_Full_book_multi_progres_Dialog_test.py"
+@@
+             with gr.Row():
+                 est_end_time_text_d = gr.Textbox(label="Прогноз закінчення", interactive=False)
+                 remaining_time_text_d = gr.Textbox(label="Час до закінчення", interactive=False)
+ 
+-            # Кнопки збереження/завантаження та Radio вже створені всередині «Опції збереження»
++            # ПОВЕРНЕНІ КНОПКИ ЗБЕРЕЖЕННЯ/ЗАВАНТАЖЕННЯ (видимі зверху, поза спойлером)
++            with gr.Row():
++                save_settings_download_btn_top = gr.DownloadButton("💾 Зберегти налаштування мовців")
++                save_settings_default_btn_top = gr.Button("📁 Зберегти у папку за замовчуванням")
++                load_settings_btn_top = gr.UploadButton(
++                    "📂 Завантажити налаштування (.txt)",
++                    file_types=[".txt"],
++                    file_count="single"
++                )
+@@
+             # --- 1) ЕКСПОРТ У ФАЙЛ ДЛЯ ЗАВАНТАЖЕННЯ (стабільно, без кешу та «старих» значень) ---
+             def export_speaker_settings_for_download(*flat_values):
+@@
+             save_settings_download_btn.click(
+                 fn=export_speaker_settings_for_download,
+                 inputs=voice_components + speed_components,
+                 outputs=save_settings_download_btn,
+             )
++            # дублюємо для верхньої кнопки
++            save_settings_download_btn_top.click(
++                fn=export_speaker_settings_for_download,
++                inputs=voice_components + speed_components,
++                outputs=save_settings_download_btn_top,
++            )
+@@
+             save_settings_default_btn.click(
+                 fn=save_speaker_settings_to_default,
+                 inputs=voice_components + speed_components,
+                 outputs=[],
+             )
++            save_settings_default_btn_top.click(
++                fn=save_speaker_settings_to_default,
++                inputs=voice_components + speed_components,
++                outputs=[],
++            )
+@@
+             load_settings_btn.upload(
+                 fn=load_speaker_settings_uploaded,
+                 inputs=[load_settings_btn] + voice_components + speed_components,
+                 outputs=voice_components + speed_components,
+             )
++            load_settings_btn_top.upload(
++                fn=load_speaker_settings_uploaded,
++                inputs=[load_settings_btn_top] + voice_components + speed_components,
++                outputs=voice_components + speed_components,
++            )

@@ -1,0 +1,29 @@
+venv/
+.env
+.idea/
+.vscode/
+*.pt
+*.ckpt
+*.onnx
+*.pth
+/data/**
+/models/**
+/outputs/**
+__pycache__/
+__pycache__/
+__pycache__/
+.git/
+__pycache__/
+old/
+output_audio/
+Кирило Булкін/
+.git/
+__pycache__/
+old/
+output_audio/
+Кирило Булкін/
+output_audio/
+output_audio/
+old/
+output_audio/
+Кирило Булкін/
