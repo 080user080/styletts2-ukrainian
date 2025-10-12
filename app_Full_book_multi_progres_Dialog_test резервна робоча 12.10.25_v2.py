@@ -1,14 +1,16 @@
 ﻿import os
 import time
-import threading
 import re
 import unicodedata
 import traceback
-import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterable, List, Sequence, Tuple
+
 import gradio as gr
 import numpy as np
 import soundfile as sf
+
 from app import synthesize, prompts_list
 try:
     from transformers import AutoTokenizer
@@ -16,9 +18,13 @@ except Exception:
     AutoTokenizer = None
 
 OUTPUT_DIR = "output_audio"
+SPEAKER_MAX = 30
+PROGRESS_POLL_INTERVAL = 1.0
 
 class NoProgress:
-    def tqdm(self, iterable):
+    """Мінімальний об'єкт-заглушка для інтерфейсу progress."""
+
+    def tqdm(self, iterable: Iterable):
         return iterable
 
 def format_hms(seconds):
@@ -172,24 +178,84 @@ def parse_dialog_tags(text):
     return parsed
 
 
+def _safe_float(value, default: float = 1.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _read_text_source(text_input: str | None, file_path: str | None) -> str:
+    if text_input and text_input.strip():
+        return text_input
+    if file_path:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    raise RuntimeError("Немає тексту для озвучення")
+
+
+def _should_use_single_voice(voice: str | None) -> bool:
+    if not voice:
+        return False
+    vname_l = voice.lower()
+    return ("філат" in vname_l) or ("filat" in vname_l)
+
+
+def _needs_plbert_fallback(error_text: str) -> bool:
+    return (
+        "must match the existing size (512)" in error_text
+        or "expanded size of the tensor" in error_text
+    )
+
+
+def _synthesize_chunk(chunk: str, voice: str | None, speed: float) -> Tuple[int, np.ndarray]:
+    """Синтезує один шматок тексту з урахуванням усіх запасних стратегій."""
+
+    use_single = _should_use_single_voice(voice)
+
+    def run_for_parts(parts: Sequence[str]) -> Tuple[int, np.ndarray]:
+        waves: List[np.ndarray] = []
+        sr_local: int | None = None
+        mode = "single" if use_single else "multi"
+        voice_name = None if use_single else (voice or None)
+        for part in parts:
+            txt = normalize_text(part)
+            sr_local, audio = synthesize(mode, txt, speed, voice_name=voice_name, progress=NoProgress())
+            waves.append(audio)
+        if sr_local is None:
+            raise RuntimeError("Synthesis did not return sample rate")
+        audio_np = waves[0] if len(waves) == 1 else np.concatenate(waves, axis=0)
+        return sr_local, audio_np
+
+    parts: List[str] = [chunk]
+    if _tok_len(chunk) > PLBERT_SAFE or len(chunk) > CHAR_CAP:
+        parts = split_to_parts(chunk, max_tokens=min(HARD_MAX_TOKENS, PLBERT_SAFE // 2))
+
+    try:
+        return run_for_parts(parts)
+    except Exception:
+        first_err = traceback.format_exc()
+        if _needs_plbert_fallback(first_err):
+            try:
+                fallback_parts = split_to_parts(chunk, max_tokens=PLBERT_SAFE // 3)
+                return run_for_parts(fallback_parts)
+            except Exception:
+                raise RuntimeError(f"Synthesis error:\n{traceback.format_exc()}") from None
+        raise RuntimeError(f"Synthesis error:\n{first_err}") from None
+
+
 def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, save_option):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     global_start = time.time()
 
-    if (text_input or '').strip():
-        text = text_input
-    elif file_path:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-    else:
-        raise RuntimeError('Немає тексту для озвучення')
+    text = _read_text_source(text_input, file_path)
 
     parsed = parse_dialog_tags(text)
     total_parts = max(1, len(parsed))
     times_per_part = []
 
-    voice_map = {i+1: (voices_flat[i] if i < len(voices_flat) else None) for i in range(30)}
-    speed_map = {i+1: (float(speeds_flat[i]) if i < len(speeds_flat) else 1.0) for i in range(30)}
+    voice_map = {i + 1: (voices_flat[i] if i < len(voices_flat) else None) for i in range(SPEAKER_MAX)}
+    speed_map = {i + 1: (_safe_float(speeds_flat[i]) if i < len(speeds_flat) else 1.0) for i in range(SPEAKER_MAX)}
 
     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
 
@@ -199,83 +265,28 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         part_start = time.time()
         voice = voice_map.get(tag_num, None)
         spd = speed_map.get(tag_num, 1.0)
-        # Робимо визначення Філатова нечутливим до регістру/варіантів написання
-        vname_l = (voice or "").lower()
-        # ВАЖЛИВО: усі варіації *filatov*/«філатов» мають іти через single-модель,
-        # навіть якщо такий пункт є у списку голосів (prompts_list).
-        # Інакше multi-параметри дають спотворений звук/тишу.
-        use_single = ('філат' in vname_l) or ('filat' in vname_l)
-        result = {}
 
-        def run_synth():
-            try:
-                # ДОДАТКОВИЙ ЗАХИСТ: якщо оцінка > PLBERT_SAFE або дуже довгий текст — дробимо ще раз.
-                parts = [chunk]
-                if _tok_len(chunk) > PLBERT_SAFE or len(chunk) > CHAR_CAP:
-                    parts = split_to_parts(chunk, max_tokens=min(HARD_MAX_TOKENS, PLBERT_SAFE // 2))
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_synthesize_chunk, chunk, voice, spd)
 
-                waves = []
-                sr_local = None
-                for part in parts:
-                    txt = normalize_text(part)  # зберігає '+'
-                    if use_single:
-                        # single = Філатов, voice_name не потрібен
-                        sr_local, a = synthesize('single', txt, spd, voice_name=None, progress=NoProgress())
-                    else:
-                        sr_local, a = synthesize('multi', txt, spd, voice_name=(voice or None), progress=NoProgress())
-                    waves.append(a)
+            while not future.done():
+                now = time.time()
+                elapsed = int(now - global_start)
+                elapsed_str = f"{elapsed} сек --- {format_hms(elapsed)}"
+                est_finish_str = 'Розрахунок...'
+                rem_text = 'Розрахунок...'
+                if times_per_part:
+                    avg_time = sum(times_per_part) / len(times_per_part)
+                    est_total_time = avg_time * total_parts
+                    est_finish_str = time.strftime('%H:%M:%S', time.localtime(global_start + est_total_time))
+                    rem_secs = int(global_start + est_total_time - now)
+                    rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
+                    rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
 
-                # об’єднати, якщо було дрібнення
-                audio_np_local = waves[0] if len(waves) == 1 else np.concatenate(waves, axis=0)
-                result['sr'] = sr_local
-                result['audio'] = audio_np_local
-            except Exception:
-                # Якщо все ж впали на 512 — дрібнимо агресивно і пробуємо ще раз.
-                err = traceback.format_exc()
-                if 'must match the existing size (512)' in err or 'expanded size of the tensor' in err:
-                    try:
-                        parts = split_to_parts(chunk, max_tokens=PLBERT_SAFE // 3)
-                        waves = []
-                        sr_local = None
-                        for part in parts:
-                            txt = normalize_text(part)
-                            mode = 'single' if use_single else 'multi'
-                            sr_local, a = synthesize(
-                                mode, txt, spd,
-                                voice_name=(None if use_single else (voice or None)),
-                                progress=NoProgress()
-                            )
-                            waves.append(a)
-                        result['sr'] = sr_local
-                        result['audio'] = np.concatenate(waves, axis=0)
-                    except Exception:
-                        result['error'] = traceback.format_exc()
-        th = threading.Thread(target=run_synth)
-        th.start()
+                yield (None, gr.update(value=idx, maximum=total_parts), elapsed_str, start_time_str, None, est_finish_str, rem_text)
+                time.sleep(PROGRESS_POLL_INTERVAL)
 
-        while th.is_alive():
-            now = time.time()
-            elapsed = int(now - global_start)
-            elapsed_str = f"{elapsed} сек --- {format_hms(elapsed)}"
-            est_finish_str = 'Розрахунок...'
-            rem_text = 'Розрахунок...'
-            if times_per_part:
-                avg_time = sum(times_per_part) / len(times_per_part)
-                est_total_time = avg_time * total_parts
-                est_finish_str = time.strftime('%H:%M:%S', time.localtime(global_start + est_total_time))
-                rem_secs = int(global_start + est_total_time - now)
-                rem_min, rem_sec = divmod(max(rem_secs,0), 60)
-                rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
-
-            yield (None, gr.update(value=idx, maximum=total_parts), elapsed_str, start_time_str, None, est_finish_str, rem_text)
-            time.sleep(1)
-
-        th.join()
-        if 'error' in result:
-            raise RuntimeError(f"Synthesis error:\n{result['error']}")
-
-        sr = result['sr']
-        audio_np = result['audio']
+            sr, audio_np = future.result()
         audio_filename = os.path.join(OUTPUT_DIR, f"part_{idx:03}.wav")
         sf.write(audio_filename, audio_np, sr)
 
@@ -288,14 +299,23 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         times_per_part.append(part_end - part_start)
 
         end_time_str = time.strftime('%H:%M:%S', time.localtime(part_end))
-        elapsed_total = f"{int(part_end - global_start)} сек"
+        elapsed_seconds = int(part_end - global_start)
+        elapsed_total = f"{elapsed_seconds} сек --- {format_hms(elapsed_seconds)}"
 
         yield (audio_filename, gr.update(value=idx, maximum=total_parts), elapsed_total, start_time_str, end_time_str, None, "")
 
     total_elapsed_secs = int(time.time() - global_start)
     total_formatted = format_hms(total_elapsed_secs)
     print(f"\033[92mЗатрачено часу: {total_formatted}\033[0m")
-    yield (None, gr.update(value=total_parts, maximum=total_parts), f"Завершено за {total_elapsed_secs} сек", start_time_str, time.strftime('%H:%M:%S', time.localtime(time.time())), None, "")
+    yield (
+        None,
+        gr.update(value=total_parts, maximum=total_parts),
+        f"Завершено за {total_elapsed_secs} сек",
+        start_time_str,
+        time.strftime('%H:%M:%S', time.localtime(time.time())),
+        None,
+        "",
+    )
 
 
 # UI
@@ -306,30 +326,163 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
         with gr.TabItem('Multi Dialog'):
             text_input_d = gr.Textbox(label='📋 Введіть текст або залиште порожнім і оберіть файл', lines=10, placeholder='Вставте текст тут...')
             file_input_d = gr.File(label='Або оберіть текстовий файл', type='filepath')
-
             speaker_choices = prompts_list
 
-            voice_components = []
-            speed_components = []
+            # ===== Компоненти голосів і швидкостей (у порядку #g1..#g30) =====
+            voice_components: list[gr.Dropdown] = []
+            speed_components: list[gr.Slider] = []
+            DEFAULT_VISIBLE = 3  # дефолт для автопідсвітлення після введення
 
-            gr.Markdown("**Налаштування голосів для тегів #g1..#g30**")
+            gr.Markdown("**Налаштування голосів**")
 
-            for i in range(3):
-                with gr.Row():
-                    dd = gr.Dropdown(label=f'Голос для #g{i+1}', choices=speaker_choices, value=speaker_choices[0])
-                    sv = gr.Slider(0.7, 1.3, value=0.88, label=f'Швидкість для #g{i+1}')
+            # --- Допоміжний конструктор клітинки для одного спікера ---
+            def _speaker_cell(i: int):
+                # ВАЖЛИВО: робимо елементи видимими за замовчуванням, щоб акордеони не виглядали порожніми.
+                # Подальша логіка автоприховування керується on_text_changed/on_file_changed.
+                dd = gr.Dropdown(
+                    label=f'Голос для #g{i}',
+                    choices=speaker_choices,
+                    value=speaker_choices[0],
+                    visible=True
+                )
+                sv = gr.Slider(0.7, 1.3, value=0.88, label=f'Швидкість для #g{i}', visible=True)
                 voice_components.append(dd)
                 speed_components.append(sv)
 
-            with gr.Accordion("Розгорнути інші голоси (#g4..#g30)", open=False):
-                for i in range(3, 30):
-                    with gr.Row():
-                        dd = gr.Dropdown(label=f'Голос для #g{i+1}', choices=speaker_choices, value=speaker_choices[0])
-                        sv = gr.Slider(0.7, 1.3, value=0.88, label=f'Швидкість для #g{i+1}')
-                    voice_components.append(dd)
-                    speed_components.append(sv)
+            # ===== ГРУПА 1: #g1–#g3 (акордеон відкритий) =====
+            with gr.Accordion("Спікери #g1–#g3", open=True) as acc_1_3:
+                with gr.Row():
+                    for i in (1, 2, 3):
+                        with gr.Column():
+                            _speaker_cell(i)
 
-            save_option_d = gr.Radio(choices=save_choices, label='Опції збереження', value=save_choices[1])
+            # ===== ГРУПА 2: #g4–#g12 (акордеон закритий) =====
+            with gr.Accordion("Спікери #g4–#g12", open=False) as acc_4_12:
+                # Ряд 1: #g4 #g5 #g6
+                with gr.Row():
+                    for i in (4, 5, 6):
+                        with gr.Column():
+                            _speaker_cell(i)
+                # Ряд 2: #g7 #g8 #g9
+                with gr.Row():
+                    for i in (7, 8, 9):
+                        with gr.Column():
+                            _speaker_cell(i)
+                # Ряд 3: #g10 #g11 #g12
+                with gr.Row():
+                    for i in (10, 11, 12):
+                        with gr.Column():
+                            _speaker_cell(i)
+
+            # ===== ГРУПА 3: Додаткові голоси (акордеон закритий) =====
+            with gr.Accordion("Додаткові голоси", open=False) as acc_more:
+                # --- Підгрупа: #g13–#g21 ---
+                with gr.Accordion("Спікери #g13–#g21", open=False) as acc_13_21:
+                    with gr.Row():
+                        for i in (13, 14, 15):
+                            with gr.Column():
+                                _speaker_cell(i)
+                    with gr.Row():
+                        for i in (16, 17, 18):
+                            with gr.Column():
+                                _speaker_cell(i)
+                    with gr.Row():
+                        for i in (19, 20, 21):
+                            with gr.Column():
+                                _speaker_cell(i)
+                # --- Підгрупа: #g22–#g30 ---
+                with gr.Accordion("Спікери #g22–#g30", open=False) as acc_22_30:
+                    with gr.Row():
+                        for i in (22, 23, 24):
+                            with gr.Column():
+                                _speaker_cell(i)
+                    with gr.Row():
+                        for i in (25, 26, 27):
+                            with gr.Column():
+                                _speaker_cell(i)
+                    with gr.Row():
+                        for i in (28, 29, 30):
+                            with gr.Column():
+                                _speaker_cell(i)
+
+                # --- Опції збереження під спойлером усередині «Додаткові голоси» ---
+                with gr.Accordion("Опції збереження", open=False) as acc_opts:
+                    save_option_d = gr.Radio(choices=save_choices, label='Опції збереження', value=save_choices[1])
+                    with gr.Row():
+                        # 1) Зберегти як файл (Download)
+                        save_settings_download_btn = gr.DownloadButton("💾 Зберегти налаштування мовців")
+                        # 2) Зберегти у папку за замовчуванням
+                        save_settings_default_btn = gr.Button("📁 Зберегти у папку за замовчуванням")
+                        # 3) Завантажити з файлу
+                        load_settings_btn = gr.UploadButton(
+                            "📂 Завантажити налаштування (.txt)",
+                            file_types=[".txt"],
+                            file_count="single"
+                        )
+
+            # --- Автовизначення кількості спікерів із тексту + автокерування видимістю та відкриттям акордеонів ---
+            _g_tag_re = re.compile(r'#g\s*([1-9]|[12]\d|30)\b', re.IGNORECASE)
+
+            def _max_g_tag_from_text(s: str | None) -> int:
+                if not s:
+                    return DEFAULT_VISIBLE
+                m = [int(x) for x in _g_tag_re.findall(s)]
+                if not m:
+                    return DEFAULT_VISIBLE
+                return max(1, min(30, max(m)))
+
+            def _visibility_updates(n: int):
+                # 30 dropdown + 30 sliders
+                updates = []
+                for i in range(1, 31):
+                    show = (i <= n)
+                    updates.append(gr.update(visible=show))  # dropdown
+                for i in range(1, 31):
+                    show = (i <= n)
+                    updates.append(gr.update(visible=show))  # slider
+                # Відкривати лише ті акордеони, де є видимі елементи
+                acc_updates = [
+                    gr.update(open=(n >= 1)),   # acc_1_3
+                    gr.update(open=(n >= 4)),   # acc_4_12
+                    gr.update(open=(n >= 13)),  # acc_more
+                    gr.update(open=(n >= 13)),  # acc_13_21
+                    gr.update(open=(n >= 22)),  # acc_22_30
+                    gr.update(open=False),      # acc_opts залишається закритим
+                ]
+                return updates + acc_updates
+
+            def on_text_changed(txt):
+                n = _max_g_tag_from_text(txt)
+                return _visibility_updates(n)
+
+            def on_file_changed(path_like):
+                p = None
+                if isinstance(path_like, str):
+                    p = path_like
+                elif isinstance(path_like, dict):
+                    p = path_like.get("name") or path_like.get("path")
+                if not p or not os.path.exists(p):
+                    return _visibility_updates(DEFAULT_VISIBLE)
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        txt = f.read()
+                except Exception:
+                    txt = ""
+                n = _max_g_tag_from_text(txt)
+                return _visibility_updates(n)
+
+            # Події: підлаштовуємо видимість та відкриття акордеонів під максимум #gN
+            text_input_d.change(
+                fn=on_text_changed,
+                inputs=[text_input_d],
+                outputs=(voice_components + speed_components + [acc_1_3, acc_4_12, acc_more, acc_13_21, acc_22_30, acc_opts])
+            )
+            file_input_d.change(
+                fn=on_file_changed,
+                inputs=[file_input_d],
+                outputs=(voice_components + speed_components + [acc_1_3, acc_4_12, acc_more, acc_13_21, acc_22_30, acc_opts])
+            )
+            # Кнопка запуску
             btn_d = gr.Button('▶ Розпочати')
             output_audio_d = gr.Audio(label='🔊 Поточна частина', type='filepath')
             part_slider_d = gr.Slider(label='Частина тексту', minimum=1, maximum=1, step=1, value=1, interactive=False)
@@ -341,25 +494,18 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 est_end_time_text_d = gr.Textbox(label="Прогноз закінчення", interactive=False)
                 remaining_time_text_d = gr.Textbox(label="Час до закінчення", interactive=False)
 
-            # --- ТРИ КНОПКИ ДЛЯ КОНФІГУРАЦІЇ МОВЦІВ ---
+            # ПОВЕРНЕНІ КНОПКИ ЗБЕРЕЖЕННЯ/ЗАВАНТАЖЕННЯ (видимі зверху, поза спойлером)
             with gr.Row():
-                # 1) Кнопка: сформувати файл і викликати "Save as" у браузері
-                save_settings_download_btn = gr.DownloadButton("💾 Зберегти налаштування мовців")
-                # 2) Зберегти у папку за замовчуванням (OUTPUT_DIR)
-                save_settings_default_btn = gr.Button("📁 Зберегти у папку за замовчуванням")
-                # 3) Завантажити налаштування з файлу (.txt)
-                load_settings_btn = gr.UploadButton(
+                save_settings_download_btn_top = gr.DownloadButton("💾 Зберегти налаштування мовців")
+                save_settings_default_btn_top = gr.Button("📁 Зберегти у папку за замовчуванням")
+                load_settings_btn_top = gr.UploadButton(
                     "📂 Завантажити налаштування (.txt)",
                     file_types=[".txt"],
                     file_count="single"
                 )
 
-            btn_inputs = [text_input_d, file_input_d]
-            for s in speed_components:
-                btn_inputs.append(s)
-            for v in voice_components:
-                btn_inputs.append(v)
-            btn_inputs.append(save_option_d)
+            # Порядок inputs для кнопки старту: текст, файл, 30 швидкостей, 30 голосів, опція збереження
+            btn_inputs = [text_input_d, file_input_d] + speed_components + voice_components + [save_option_d]
 
             btn_outputs = [
                 output_audio_d,
@@ -410,6 +556,12 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 inputs=voice_components + speed_components,
                 outputs=save_settings_download_btn,
             )
+            # дублюємо для верхньої кнопки
+            save_settings_download_btn_top.click(
+                fn=export_speaker_settings_for_download,
+                inputs=voice_components + speed_components,
+                outputs=save_settings_download_btn_top,
+            )
 
             # --- 2) ЗБЕРЕЖЕННЯ У ПАПКУ ЗА ЗАМОВЧУВАННЯМ (OUTPUT_DIR) ---
             def save_speaker_settings_to_default(*flat_values):
@@ -430,6 +582,11 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 gr.Info(f"✅ Налаштування збережено: {cfg_path}")
 
             save_settings_default_btn.click(
+                fn=save_speaker_settings_to_default,
+                inputs=voice_components + speed_components,
+                outputs=[],
+            )
+            save_settings_default_btn_top.click(
                 fn=save_speaker_settings_to_default,
                 inputs=voice_components + speed_components,
                 outputs=[],
@@ -485,13 +642,17 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 inputs=[load_settings_btn] + voice_components + speed_components,
                 outputs=voice_components + speed_components,
             )
+            load_settings_btn_top.upload(
+                fn=load_speaker_settings_uploaded,
+                inputs=[load_settings_btn_top] + voice_components + speed_components,
+                outputs=voice_components + speed_components,
+            )
 
             def _btn_d_handler(text_input, file_input, *flat_values):
                 speeds = list(flat_values[:30])
                 voices = list(flat_values[30:60])
                 save_option = flat_values[60]
                 yield from batch_synthesize_dialog(text_input, file_input, speeds, voices, save_option)
-
             btn_d.click(
                 fn=_btn_d_handler,
                 inputs=btn_inputs,

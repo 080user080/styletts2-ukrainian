@@ -1,47 +1,20 @@
---- app.py
-+++ app.py
-@@
- import torch
-+from pathlib import Path
-@@
--single_style = torch.load('filatov.pt')
-+def _find_first_existing(paths):
-+    for p in paths:
-+        pp = Path(p)
-+        if pp.exists():
-+            return str(pp)
-+    return None
-+
-+# Де може лежати файл стилю Філатова
-+_HERE = Path(__file__).parent
-+_FILATOV_CANDIDATES = [
-+    'filatov.pt',
-+    '09_filatov.pt',
-+    str(_HERE / 'filatov.pt'),
-+    str(_HERE / '09_filatov.pt'),
-+    str(_HERE / 'voices' / 'filatov.pt'),
-+    str(_HERE / 'voices' / '09_filatov.pt'),
-+]
-+
-+FILATOV_PATH = os.environ.get('FILATOV_PT') or _find_first_existing(_FILATOV_CANDIDATES)
-+try:
-+    single_style = torch.load(FILATOV_PATH) if FILATOV_PATH else None
-+except Exception:
-+    single_style = None
-+    print("WARN: не вдалося завантажити стиль Філатова:", FILATOV_PATH)
-@@
- def synthesize(mode, text, speed, voice_name=None, progress=None):
-     """
-     mode: 'single' | 'multi'
-     """
--    if mode == 'single':
--        # ... використовує single_style
-+    if mode == 'single':
-+        if single_style is None:
-+            raise RuntimeError(
-+                "Single-режим недоступний: відсутній файл стилю Філатова.\n"
-+                "Задай змінну середовища FILATOV_PT або поклади '09_filatov.pt' у корінь проєкту чи voices/."
-+            )
-+        # ... використовує single_style як і раніше
-         # ...
-         pass
+---/"app_Full_book_multi_progres_Dialog_test.py"
++++/"app_Full_book_multi_progres_Dialog_test.py"
+@@ -259,7 +259,7 @@
+ 
+     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
+ 
+-    yield (None, gr.update(value=1, maximum=total_parts, interactive=False), "0 сек", start_time_str, "", "Розрахунок...", "")
++    yield (None, gr.update(value=1, maximum=total_parts, interactive=False), "0 сек", start_time_str, "", "Розрахунок...", "", gr.update(value=0, maximum=total_parts, interactive=False))
+ 
+     for idx, (tag_num, chunk) in enumerate(parsed, start=1):
+         part_start = time.time()
+@@ -283,7 +283,7 @@
+                     rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
+                     rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
+ 
+-                yield (None, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_str, start_time_str, None, est_finish_str, rem_text, gr.update(value=max(idx-1, 0), maximum=total_parts, interactive=False))[:-1]
++                yield (None, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_str, start_time_str, None, est_finish_str, rem_text, gr.update(value=max(idx-1, 0), maximum=total_parts, interactive=False))
+                 time.sleep(PROGRESS_POLL_INTERVAL)
+ 
+             sr, audio_np = future.result()

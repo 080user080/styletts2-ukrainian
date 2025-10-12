@@ -259,7 +259,7 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
 
     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
 
-    yield (None, gr.update(value=1, maximum=total_parts), "0 сек", start_time_str, "", "Розрахунок...", "")
+    yield (None, gr.update(value=1, maximum=total_parts, interactive=False), "0 сек", start_time_str, "", "Розрахунок...", "", gr.update(value=0, maximum=total_parts, interactive=False))
 
     for idx, (tag_num, chunk) in enumerate(parsed, start=1):
         part_start = time.time()
@@ -283,7 +283,7 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
                     rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
                     rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
 
-                yield (None, gr.update(value=idx, maximum=total_parts), elapsed_str, start_time_str, None, est_finish_str, rem_text)
+                yield (None, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_str, start_time_str, None, est_finish_str, rem_text, gr.update(value=max(idx-1, 0), maximum=total_parts, interactive=False))
                 time.sleep(PROGRESS_POLL_INTERVAL)
 
             sr, audio_np = future.result()
@@ -302,23 +302,21 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         elapsed_seconds = int(part_end - global_start)
         elapsed_total = f"{elapsed_seconds} сек --- {format_hms(elapsed_seconds)}"
 
-        yield (audio_filename, gr.update(value=idx, maximum=total_parts), elapsed_total, start_time_str, end_time_str, None, "")
+        yield (audio_filename, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_total, start_time_str, end_time_str, None, "", gr.update(value=idx, maximum=total_parts, interactive=False))
 
     total_elapsed_secs = int(time.time() - global_start)
     total_formatted = format_hms(total_elapsed_secs)
     print(f"\033[92mЗатрачено часу: {total_formatted}\033[0m")
     yield (
         None,
-        gr.update(value=total_parts, maximum=total_parts),
+        gr.update(value=total_parts, maximum=total_parts, interactive=True),
         f"Завершено за {total_elapsed_secs} сек",
         start_time_str,
         time.strftime('%H:%M:%S', time.localtime(time.time())),
         None,
         "",
-    )
-
-
-# UI
+        gr.update(value=total_parts, maximum=total_parts, interactive=False)
+    )# UI
 save_choices = ['Зберегти всі частини озвученого тексту', 'Без збереження']
 
 with gr.Blocks(title="Batch TTS з Прогресом") as demo:
@@ -484,12 +482,16 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
             )
             # Кнопка запуску
             btn_d = gr.Button('▶ Розпочати')
-            output_audio_d = gr.Audio(label='🔊 Поточна частина', type='filepath')
-            part_slider_d = gr.Slider(label='Частина тексту', minimum=1, maximum=1, step=1, value=1, interactive=False)
+            with gr.Accordion('🔊 Поточна частина', open=False):
+                autoplay_chk_d = gr.Checkbox(label='Автовідтворення при зміні частини', value=False)
+                output_audio_d = gr.Audio(label='🔊 Поточна частина', type='filepath', autoplay=False)
+                part_slider_d = gr.Slider(label='Частина тексту', minimum=1, maximum=1, step=1, value=1, interactive=False)
             with gr.Row():
                 timer_text_d = gr.Textbox(label="⏱️ Відлік часу (сек)", value="0", interactive=False)
                 start_time_text_d = gr.Textbox(label="Початок озвучення", interactive=False)
                 end_time_text_d = gr.Textbox(label="Закінчення озвучення попередньої частини", interactive=False)
+            with gr.Row():
+                parts_progress_d = gr.Slider(label='Частин для озвучення', minimum=0, maximum=1, step=1, value=0, interactive=False)
             with gr.Row():
                 est_end_time_text_d = gr.Textbox(label="Прогноз закінчення", interactive=False)
                 remaining_time_text_d = gr.Textbox(label="Час до закінчення", interactive=False)
@@ -515,7 +517,9 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 end_time_text_d,
                 est_end_time_text_d,
                 remaining_time_text_d,
+                parts_progress_d,
             ]
+
 
             # --- 1) ЕКСПОРТ У ФАЙЛ ДЛЯ ЗАВАНТАЖЕННЯ (стабільно, без кешу та «старих» значень) ---
             def export_speaker_settings_for_download(*flat_values):
@@ -658,6 +662,26 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 inputs=btn_inputs,
                 outputs=btn_outputs,
                 show_progress=False
+            )
+
+            # === Інтерактивність слайдера «Частина тексту» після завершення ===
+            def _on_part_slider_change(part_idx: int, autoplay: bool):
+                try:
+                    i = int(part_idx)
+                except Exception:
+                    gr.Warning("Некоректний номер частини")
+                    return gr.update()
+                wav_path = os.path.join(OUTPUT_DIR, f"part_{i:03}.wav")
+                if not os.path.exists(wav_path):
+                    gr.Error(f"Файл не знайдено: {wav_path}")
+                    return gr.update()
+                # Повертаємо оновлення аудіо. Якщо підтримується, встановимо autoplay
+                return gr.update(value=wav_path, autoplay=bool(autoplay))
+
+            part_slider_d.change(
+                fn=_on_part_slider_change,
+                inputs=[part_slider_d, autoplay_chk_d],
+                outputs=[output_audio_d],
             )
 
 if __name__ == '__main__':
