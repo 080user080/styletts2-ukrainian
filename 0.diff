@@ -1,34 +1,47 @@
----/app_Full_book_multi_progres_Dialog_test.py
-+++ /app_Full_book_multi_progres_Dialog_test.py
+--- app.py
++++ app.py
 @@
--        # Робимо визначення Філатова нечутливим до регістру/варіантів написання
--        vname_l = (voice or "").lower()
--        # ---------------------------------------------------------------------------
--        # Визначення, коли слід використовувати single-модель (Філатов)
--        #
--        # Первісна логіка використовувала лише перевірку на наявність 'філат'
--        # або 'filat' у назві голосу. Це призводило до того, що деякі
--        # мульти-версії (наприклад, «09_filatov») помилково відносились до
--        # single-моделі, і вихідний звук був спотвореним.
--        #
--        # Тепер ми визначаємо single-модель лише тоді, коли голос не входить
--        # у список prompts_list (усі мульти-голоси) або коли користувач не
--        # обрав конкретний голос. Усі голоси з prompts_list, навіть якщо в
--        # них є підрядок «filat»/«філат», обробляються мульти-моделлю.
--        use_single = False
--        if ('філат' in vname_l) or ('filat' in vname_l):
--            # Використовуємо prompts_list, імпортований на рівні модуля, як джерело
--            # мульти-голосів. Якщо голос не в prompts_list або відсутній, це
--            # означає, що його потрібно синтезувати через single-модель.
--            try:
--                _pl = prompts_list  # prompts_list імпортовано з app на початку модуля
--            except NameError:
--                _pl = []
--            if (not voice) or (voice not in _pl):
--                use_single = True
-+        # Робимо визначення Філатова нечутливим до регістру/варіантів написання
-+        vname_l = (voice or "").lower()
-+        # ВАЖЛИВО: усі варіації *filatov*/«філатов» мають іти через single-модель,
-+        # навіть якщо такий пункт є у списку голосів (prompts_list).
-+        # Інакше multi-параметри дають спотворений звук/тишу.
-+        use_single = ('філат' in vname_l) or ('filat' in vname_l)
+ import torch
++from pathlib import Path
+@@
+-single_style = torch.load('filatov.pt')
++def _find_first_existing(paths):
++    for p in paths:
++        pp = Path(p)
++        if pp.exists():
++            return str(pp)
++    return None
++
++# Де може лежати файл стилю Філатова
++_HERE = Path(__file__).parent
++_FILATOV_CANDIDATES = [
++    'filatov.pt',
++    '09_filatov.pt',
++    str(_HERE / 'filatov.pt'),
++    str(_HERE / '09_filatov.pt'),
++    str(_HERE / 'voices' / 'filatov.pt'),
++    str(_HERE / 'voices' / '09_filatov.pt'),
++]
++
++FILATOV_PATH = os.environ.get('FILATOV_PT') or _find_first_existing(_FILATOV_CANDIDATES)
++try:
++    single_style = torch.load(FILATOV_PATH) if FILATOV_PATH else None
++except Exception:
++    single_style = None
++    print("WARN: не вдалося завантажити стиль Філатова:", FILATOV_PATH)
+@@
+ def synthesize(mode, text, speed, voice_name=None, progress=None):
+     """
+     mode: 'single' | 'multi'
+     """
+-    if mode == 'single':
+-        # ... використовує single_style
++    if mode == 'single':
++        if single_style is None:
++            raise RuntimeError(
++                "Single-режим недоступний: відсутній файл стилю Філатова.\n"
++                "Задай змінну середовища FILATOV_PT або поклади '09_filatov.pt' у корінь проєкту чи voices/."
++            )
++        # ... використовує single_style як і раніше
+         # ...
+         pass

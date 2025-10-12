@@ -1,14 +1,16 @@
 ﻿import os
 import time
-import threading
 import re
 import unicodedata
 import traceback
-import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterable, List, Sequence, Tuple
+
 import gradio as gr
 import numpy as np
 import soundfile as sf
+
 from app import synthesize, prompts_list
 try:
     from transformers import AutoTokenizer
@@ -16,9 +18,13 @@ except Exception:
     AutoTokenizer = None
 
 OUTPUT_DIR = "output_audio"
+SPEAKER_MAX = 30
+PROGRESS_POLL_INTERVAL = 1.0
 
 class NoProgress:
-    def tqdm(self, iterable):
+    """Мінімальний об'єкт-заглушка для інтерфейсу progress."""
+
+    def tqdm(self, iterable: Iterable):
         return iterable
 
 def format_hms(seconds):
@@ -172,24 +178,84 @@ def parse_dialog_tags(text):
     return parsed
 
 
+def _safe_float(value, default: float = 1.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _read_text_source(text_input: str | None, file_path: str | None) -> str:
+    if text_input and text_input.strip():
+        return text_input
+    if file_path:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    raise RuntimeError("Немає тексту для озвучення")
+
+
+def _should_use_single_voice(voice: str | None) -> bool:
+    if not voice:
+        return False
+    vname_l = voice.lower()
+    return ("філат" in vname_l) or ("filat" in vname_l)
+
+
+def _needs_plbert_fallback(error_text: str) -> bool:
+    return (
+        "must match the existing size (512)" in error_text
+        or "expanded size of the tensor" in error_text
+    )
+
+
+def _synthesize_chunk(chunk: str, voice: str | None, speed: float) -> Tuple[int, np.ndarray]:
+    """Синтезує один шматок тексту з урахуванням усіх запасних стратегій."""
+
+    use_single = _should_use_single_voice(voice)
+
+    def run_for_parts(parts: Sequence[str]) -> Tuple[int, np.ndarray]:
+        waves: List[np.ndarray] = []
+        sr_local: int | None = None
+        mode = "single" if use_single else "multi"
+        voice_name = None if use_single else (voice or None)
+        for part in parts:
+            txt = normalize_text(part)
+            sr_local, audio = synthesize(mode, txt, speed, voice_name=voice_name, progress=NoProgress())
+            waves.append(audio)
+        if sr_local is None:
+            raise RuntimeError("Synthesis did not return sample rate")
+        audio_np = waves[0] if len(waves) == 1 else np.concatenate(waves, axis=0)
+        return sr_local, audio_np
+
+    parts: List[str] = [chunk]
+    if _tok_len(chunk) > PLBERT_SAFE or len(chunk) > CHAR_CAP:
+        parts = split_to_parts(chunk, max_tokens=min(HARD_MAX_TOKENS, PLBERT_SAFE // 2))
+
+    try:
+        return run_for_parts(parts)
+    except Exception:
+        first_err = traceback.format_exc()
+        if _needs_plbert_fallback(first_err):
+            try:
+                fallback_parts = split_to_parts(chunk, max_tokens=PLBERT_SAFE // 3)
+                return run_for_parts(fallback_parts)
+            except Exception:
+                raise RuntimeError(f"Synthesis error:\n{traceback.format_exc()}") from None
+        raise RuntimeError(f"Synthesis error:\n{first_err}") from None
+
+
 def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, save_option):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     global_start = time.time()
 
-    if (text_input or '').strip():
-        text = text_input
-    elif file_path:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-    else:
-        raise RuntimeError('Немає тексту для озвучення')
+    text = _read_text_source(text_input, file_path)
 
     parsed = parse_dialog_tags(text)
     total_parts = max(1, len(parsed))
     times_per_part = []
 
-    voice_map = {i+1: (voices_flat[i] if i < len(voices_flat) else None) for i in range(30)}
-    speed_map = {i+1: (float(speeds_flat[i]) if i < len(speeds_flat) else 1.0) for i in range(30)}
+    voice_map = {i + 1: (voices_flat[i] if i < len(voices_flat) else None) for i in range(SPEAKER_MAX)}
+    speed_map = {i + 1: (_safe_float(speeds_flat[i]) if i < len(speeds_flat) else 1.0) for i in range(SPEAKER_MAX)}
 
     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
 
@@ -199,83 +265,28 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         part_start = time.time()
         voice = voice_map.get(tag_num, None)
         spd = speed_map.get(tag_num, 1.0)
-        # Робимо визначення Філатова нечутливим до регістру/варіантів написання
-        vname_l = (voice or "").lower()
-        # ВАЖЛИВО: усі варіації *filatov*/«філатов» мають іти через single-модель,
-        # навіть якщо такий пункт є у списку голосів (prompts_list).
-        # Інакше multi-параметри дають спотворений звук/тишу.
-        use_single = ('філат' in vname_l) or ('filat' in vname_l)
-        result = {}
 
-        def run_synth():
-            try:
-                # ДОДАТКОВИЙ ЗАХИСТ: якщо оцінка > PLBERT_SAFE або дуже довгий текст — дробимо ще раз.
-                parts = [chunk]
-                if _tok_len(chunk) > PLBERT_SAFE or len(chunk) > CHAR_CAP:
-                    parts = split_to_parts(chunk, max_tokens=min(HARD_MAX_TOKENS, PLBERT_SAFE // 2))
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_synthesize_chunk, chunk, voice, spd)
 
-                waves = []
-                sr_local = None
-                for part in parts:
-                    txt = normalize_text(part)  # зберігає '+'
-                    if use_single:
-                        # single = Філатов, voice_name не потрібен
-                        sr_local, a = synthesize('single', txt, spd, voice_name=None, progress=NoProgress())
-                    else:
-                        sr_local, a = synthesize('multi', txt, spd, voice_name=(voice or None), progress=NoProgress())
-                    waves.append(a)
+            while not future.done():
+                now = time.time()
+                elapsed = int(now - global_start)
+                elapsed_str = f"{elapsed} сек --- {format_hms(elapsed)}"
+                est_finish_str = 'Розрахунок...'
+                rem_text = 'Розрахунок...'
+                if times_per_part:
+                    avg_time = sum(times_per_part) / len(times_per_part)
+                    est_total_time = avg_time * total_parts
+                    est_finish_str = time.strftime('%H:%M:%S', time.localtime(global_start + est_total_time))
+                    rem_secs = int(global_start + est_total_time - now)
+                    rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
+                    rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
 
-                # об’єднати, якщо було дрібнення
-                audio_np_local = waves[0] if len(waves) == 1 else np.concatenate(waves, axis=0)
-                result['sr'] = sr_local
-                result['audio'] = audio_np_local
-            except Exception:
-                # Якщо все ж впали на 512 — дрібнимо агресивно і пробуємо ще раз.
-                err = traceback.format_exc()
-                if 'must match the existing size (512)' in err or 'expanded size of the tensor' in err:
-                    try:
-                        parts = split_to_parts(chunk, max_tokens=PLBERT_SAFE // 3)
-                        waves = []
-                        sr_local = None
-                        for part in parts:
-                            txt = normalize_text(part)
-                            mode = 'single' if use_single else 'multi'
-                            sr_local, a = synthesize(
-                                mode, txt, spd,
-                                voice_name=(None if use_single else (voice or None)),
-                                progress=NoProgress()
-                            )
-                            waves.append(a)
-                        result['sr'] = sr_local
-                        result['audio'] = np.concatenate(waves, axis=0)
-                    except Exception:
-                        result['error'] = traceback.format_exc()
-        th = threading.Thread(target=run_synth)
-        th.start()
+                yield (None, gr.update(value=idx, maximum=total_parts), elapsed_str, start_time_str, None, est_finish_str, rem_text)
+                time.sleep(PROGRESS_POLL_INTERVAL)
 
-        while th.is_alive():
-            now = time.time()
-            elapsed = int(now - global_start)
-            elapsed_str = f"{elapsed} сек --- {format_hms(elapsed)}"
-            est_finish_str = 'Розрахунок...'
-            rem_text = 'Розрахунок...'
-            if times_per_part:
-                avg_time = sum(times_per_part) / len(times_per_part)
-                est_total_time = avg_time * total_parts
-                est_finish_str = time.strftime('%H:%M:%S', time.localtime(global_start + est_total_time))
-                rem_secs = int(global_start + est_total_time - now)
-                rem_min, rem_sec = divmod(max(rem_secs,0), 60)
-                rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
-
-            yield (None, gr.update(value=idx, maximum=total_parts), elapsed_str, start_time_str, None, est_finish_str, rem_text)
-            time.sleep(1)
-
-        th.join()
-        if 'error' in result:
-            raise RuntimeError(f"Synthesis error:\n{result['error']}")
-
-        sr = result['sr']
-        audio_np = result['audio']
+            sr, audio_np = future.result()
         audio_filename = os.path.join(OUTPUT_DIR, f"part_{idx:03}.wav")
         sf.write(audio_filename, audio_np, sr)
 
@@ -288,14 +299,23 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         times_per_part.append(part_end - part_start)
 
         end_time_str = time.strftime('%H:%M:%S', time.localtime(part_end))
-        elapsed_total = f"{int(part_end - global_start)} сек"
+        elapsed_seconds = int(part_end - global_start)
+        elapsed_total = f"{elapsed_seconds} сек --- {format_hms(elapsed_seconds)}"
 
         yield (audio_filename, gr.update(value=idx, maximum=total_parts), elapsed_total, start_time_str, end_time_str, None, "")
 
     total_elapsed_secs = int(time.time() - global_start)
     total_formatted = format_hms(total_elapsed_secs)
     print(f"\033[92mЗатрачено часу: {total_formatted}\033[0m")
-    yield (None, gr.update(value=total_parts, maximum=total_parts), f"Завершено за {total_elapsed_secs} сек", start_time_str, time.strftime('%H:%M:%S', time.localtime(time.time())), None, "")
+    yield (
+        None,
+        gr.update(value=total_parts, maximum=total_parts),
+        f"Завершено за {total_elapsed_secs} сек",
+        start_time_str,
+        time.strftime('%H:%M:%S', time.localtime(time.time())),
+        None,
+        "",
+    )
 
 
 # UI
