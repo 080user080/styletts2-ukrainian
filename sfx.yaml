@@ -1,0 +1,8 @@
+normalize_dbfs: -16
+sounds:
+  v:
+    file: "бах.mp3"
+    gain_db: 0
+  d:
+    file: "рип.mp3"
+    gain_db: -3

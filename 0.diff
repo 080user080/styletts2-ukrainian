@@ -1,20 +1,9 @@
----/"app_Full_book_multi_progres_Dialog_test.py"
-+++/"app_Full_book_multi_progres_Dialog_test.py"
-@@ -259,7 +259,7 @@
- 
-     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
- 
--    yield (None, gr.update(value=1, maximum=total_parts, interactive=False), "0 сек", start_time_str, "", "Розрахунок...", "")
-+    yield (None, gr.update(value=1, maximum=total_parts, interactive=False), "0 сек", start_time_str, "", "Розрахунок...", "", gr.update(value=0, maximum=total_parts, interactive=False))
- 
-     for idx, (tag_num, chunk) in enumerate(parsed, start=1):
-         part_start = time.time()
-@@ -283,7 +283,7 @@
-                     rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
-                     rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
- 
--                yield (None, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_str, start_time_str, None, est_finish_str, rem_text, gr.update(value=max(idx-1, 0), maximum=total_parts, interactive=False))[:-1]
-+                yield (None, gr.update(value=idx, maximum=total_parts, interactive=False), elapsed_str, start_time_str, None, est_finish_str, rem_text, gr.update(value=max(idx-1, 0), maximum=total_parts, interactive=False))
-                 time.sleep(PROGRESS_POLL_INTERVAL)
- 
-             sr, audio_np = future.result()
+diff --git a/app_Full_book_multi_progres_Dialog_test.py b/app_Full_book_multi_progres_Dialog_test.py
+@@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
+-        # Otherwise unknown instruction
+-        raise RuntimeError(f"Невідомий тег або формат на рядку {line_no}: {ln}")
++        # Otherwise line does not have an explicit tag.  Treat it as a voice event for the first speaker (g1)
++        # with default speed.  This allows plain text or bullet‑style lines to be synthesized
++        # without requiring a #gX tag.
++        events.append({"type": "voice", "g": 1, "suffix": "", "text": ln})
++        continue
