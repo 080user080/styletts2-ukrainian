@@ -1,9 +1,12 @@
-diff --git a/app_Full_book_multi_progres_Dialog_test.py b/app_Full_book_multi_progres_Dialog_test.py
-@@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
--        # Otherwise unknown instruction
--        raise RuntimeError(f"Невідомий тег або формат на рядку {line_no}: {ln}")
-+        # Otherwise line does not have an explicit tag.  Treat it as a voice event for the first speaker (g1)
-+        # with default speed.  This allows plain text or bullet‑style lines to be synthesized
-+        # without requiring a #gX tag.
-+        events.append({"type": "voice", "g": 1, "suffix": "", "text": ln})
-+        continue
+*** Begin Patch
+*** Update File: app_Full_book_multi_progres_Dialog_test.py
+@@
+-    # pattern for voice events
+-    # Дозволити суфікси slow/fast з 1–3 цифрами (наприклад slow95, fast110)
+-    voice_pat = re.compile(r'^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s+(.*)$', re.IGNORECASE)
++    # pattern for voice events
++    # Дозволити суфікси slow/fast з 1–3 цифрами (наприклад slow95, fast110)
++    # Підтримка формату з двокрапкою:   #g1: текст   або  #g2_fast95: текст
++    # Тобто після тега допускається необов'язкова двокрапка та/або пробіли.
++    voice_pat = re.compile(r"^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s*:??\s+(.*)$", re.IGNORECASE)
+*** End Patch

@@ -21,7 +21,25 @@ try:
 except Exception:
     AutoTokenizer = None
 
-OUTPUT_DIR = "output_audio"
+from datetime import datetime
+
+# Base output directory. Final OUTPUT_DIR will include a timestamped subfolder
+OUTPUT_DIR_BASE = "output_audio"
+
+# Create a session-specific output folder: output_audio/YYYYMMDD_HHMMSS
+def make_session_output_dir(base: str = OUTPUT_DIR_BASE) -> str:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out = os.path.join(base, ts)
+    try:
+        os.makedirs(out, exist_ok=True)
+    except Exception:
+        # Fallback to base if creation fails
+        out = base
+        os.makedirs(out, exist_ok=True)
+    return out
+
+# Compute OUTPUT_DIR at import/run time so all writers use the same folder
+OUTPUT_DIR = make_session_output_dir()
 SPEAKER_MAX = 30
 PROGRESS_POLL_INTERVAL = 1.0
 
@@ -228,7 +246,8 @@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
         return events
     lines = normalize_text(text).splitlines()
     # pattern for voice events
-    voice_pat = re.compile(r'^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{2})?))?\s+(.*)$', re.IGNORECASE)
+    # Дозволити суфікси slow/fast з 1–3 цифрами (наприклад slow95, fast110)
+    voice_pat = re.compile(r'^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s+(.*)$', re.IGNORECASE)
     # pattern for sfx events (identifier comprised of word characters)
     sfx_pat = re.compile(r'^#([A-Za-z0-9]+)\s*$', re.IGNORECASE)
     for line_no, raw_ln in enumerate(lines, start=1):
@@ -260,8 +279,11 @@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
         if ln.startswith('#'):
             # comment, ignore
             continue
-        # Otherwise unknown instruction
-        raise RuntimeError(f"Невідомий тег або формат на рядку {line_no}: {ln}")
+        # Otherwise line does not have an explicit tag.  Treat it as a voice event for the first speaker (g1)
+        # with default speed.  This allows plain text or bullet‑style lines to be synthesized
+        # without requiring a #gX tag.
+        events.append({"type": "voice", "g": 1, "suffix": "", "text": ln})
+        continue
     return events
 
 def _compute_speed_effective(g_num: int, suffix: str, speeds_flat: List[float], ignore_speed: bool) -> float:
@@ -510,7 +532,196 @@ def batch_synthesize_dialog(text_input, file_path, speeds_flat, voices_flat, sav
         None,
         "",
         gr.update(value=total_parts, maximum=total_parts, interactive=False)
-    )# UI
+    )
+
+# -----------------------------------------------------------------------------
+# Новий варіант пакетної озвучки Multi Dialog з підтримкою подій (voice/sfx),
+# швидкісних суфіксів та SFX. Функція створює один лог-файл у папці
+# OUTPUT_DIR і повертає генератор для Gradio UI. Використовується у
+# _btn_d_handler замість старої batch_synthesize_dialog.
+def batch_synthesize_dialog_events(
+    text_input: str | None,
+    file_path: str | None,
+    speeds_flat: list,
+    voices_flat: list,
+    save_option,
+    ignore_speed: bool = False,
+) -> Iterable:
+    """
+    Обробляє сценарій Multi Dialog, підтримуючи SFX та суфікси швидкості.
+    На кожну подію (voice або sfx) створює .wav файл part_{k:03}.wav і, за бажання,
+    записує текст part_{k:03}.txt. Усі події логуються у log_{timestamp}.txt.
+
+    Parameters:
+        text_input: Текст із текстового поля (може бути None).
+        file_path: Шлях до текстового файлу (може бути None).
+        speeds_flat: Значення слайдерів швидкості (список із 30 елементів).
+        voices_flat: Значення dropdown для голосів (список із 30 елементів).
+        save_option: Опція збереження текстових частин.
+        ignore_speed: Якщо True, ігнорувати суфікси та значення слайдерів і використовувати DEFAULT_SPEED.
+    Returns:
+        Генератор, що yield'ить кортежі для оновлення інтерфейсу Gradio.
+    """
+    # Створити вихідний каталог і зафіксувати час старту
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    global_start = time.time()
+    # Прочитати текст з поля або файлу
+    text = _read_text_source(text_input, file_path)
+    # Підготовка часу старту для консолі
+    start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
+    print(f'Start: {start_time_str}')
+    # Парсинг сценарію у список подій
+    try:
+        events = parse_script_events(text, voices_flat)
+    except Exception as e:
+        print(f'Error while parsing script: {e}')
+        raise
+    total_parts = max(1, len(events))
+    times_per_part: List[float] = []
+    warnings: List[str] = []
+    base_sr: int | None = None
+    # Словник голосів по g-номеру
+    voice_map = {i + 1: (voices_flat[i] if i < len(voices_flat) else None) for i in range(SPEAKER_MAX)}
+    # Початкове оновлення інтерфейсу
+    yield (
+        None,
+        gr.update(value=1, maximum=total_parts, interactive=False),
+        "0 сек",
+        start_time_str,
+        "",
+        "Розрахунок...",
+        "",
+        gr.update(value=0, maximum=total_parts, interactive=False),
+    )
+    # Обробляємо всі події послідовно
+    for idx, event in enumerate(events, start=1):
+        part_start = time.time()
+        # Визначити тип події
+        if event.get('type') == 'voice':
+            g_num = event.get('g')
+            suffix = event.get('suffix', '')
+            text_body = event.get('text', '')
+            voice_name = voice_map.get(g_num, None)
+            # Обчислити ефективну швидкість
+            speed_eff = _compute_speed_effective(g_num, suffix, speeds_flat, ignore_speed)
+            # Зберегти попередження про вихід за межі слайдера
+            if not ignore_speed and (speed_eff < 0.7 or speed_eff > 1.3):
+                warnings.append(f'Вихід за межі слайдера швидкості для #g{g_num}: {speed_eff:.2f}')
+            # Попередження якщо голос не обрано
+            if not voice_name:
+                warnings.append(f'Не вказано голос для #g{g_num}, використовується стандартний голос.')
+            call_func = _synthesize_chunk
+            call_args = (text_body, voice_name, speed_eff)
+            extra_info = {
+                "type": "voice",
+                "g": g_num,
+                "voice_name": voice_name,
+                "speed_eff": speed_eff,
+                "text_len": len(text_body),
+                "text_body": text_body,
+            }
+        elif event.get('type') == 'sfx':
+            sfx_id = event.get('id')
+            # Визначити частоту дискретизації: використати базову, якщо вона вже відома, інакше – 24000 або значення з конфігу
+            target_sr = base_sr if base_sr else int(SFX_CONFIG.get('default_sr', 24000))
+            call_func = _load_and_process_sfx
+            call_args = (sfx_id, target_sr)
+            cfg = SFX_CONFIG.get('sounds', {}).get(sfx_id, {})
+            extra_info = {
+                "type": "sfx",
+                "sfx_id": sfx_id,
+                "file": cfg.get('file'),
+                "gain_db": cfg.get('gain_db', 0.0),
+            }
+        else:
+            warnings.append(f"Невідомий тип події: {event}")
+            continue
+        # Виконати синтез або завантаження у окремому потоці, щоб можна було оновлювати прогрес
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(call_func, *call_args)
+            while not future.done():
+                now = time.time()
+                elapsed = int(now - global_start)
+                elapsed_str = f"{elapsed} сек --- {format_hms(elapsed)}"
+                est_finish_str = 'Розрахунок...'
+                rem_text = 'Розрахунок...'
+                if times_per_part:
+                    avg_time = sum(times_per_part) / len(times_per_part)
+                    est_total_time = avg_time * total_parts
+                    est_finish_str = time.strftime('%H:%M:%S', time.localtime(global_start + est_total_time))
+                    rem_secs = int(global_start + est_total_time - now)
+                    rem_min, rem_sec = divmod(max(rem_secs, 0), 60)
+                    rem_text = f"до закінчення залишилося {rem_min} хв {rem_sec} сек"
+                yield (
+                    None,
+                    gr.update(value=idx, maximum=total_parts, interactive=False),
+                    elapsed_str,
+                    start_time_str,
+                    None,
+                    est_finish_str,
+                    rem_text,
+                    gr.update(value=max(idx - 1, 0), maximum=total_parts, interactive=False),
+                )
+                time.sleep(PROGRESS_POLL_INTERVAL)
+            try:
+                sr, audio_np = future.result()
+            except Exception as e:
+                # Вивести помилку у консоль без запису у файл
+                print(f'Error processing part {idx}: {e}')
+                raise
+        # Для першого voice запам'ятати частоту дискретизації
+        if extra_info["type"] == "voice" and base_sr is None:
+            base_sr = sr
+        # Записати аудіо файл
+        audio_filename = os.path.join(OUTPUT_DIR, f"part_{idx:03}.wav")
+        sf.write(audio_filename, audio_np, sr)
+        # За потреби – записати текстовий файл
+        if save_option == 'Зберегти всі частини озвученого тексту' and extra_info["type"] == "voice":
+            txt_filename = os.path.join(OUTPUT_DIR, f"part_{idx:03}.txt")
+            with open(txt_filename, 'w', encoding='utf-8') as txt_file:
+                txt_file.write(extra_info["text_body"])
+        # Вивести інформацію у консоль
+        if extra_info["type"] == "voice":
+            print(f'Part {idx}: type=voice, g={extra_info["g"]}, voice={extra_info["voice_name"]}, speed={extra_info["speed_eff"]:.2f}, text_len={extra_info["text_len"]}, path={audio_filename}')
+        else:
+            # Для SFX: друкуємо ідентифікатор і шлях до файлу
+            print(f'#{extra_info["sfx_id"]} --- файл "{extra_info["file"]}" -- {os.path.basename(audio_filename)}')
+        # Оновити таймінги та UI
+        part_end = time.time()
+        times_per_part.append(part_end - part_start)
+        end_time_str = time.strftime('%H:%M:%S', time.localtime(part_end))
+        elapsed_seconds = int(part_end - global_start)
+        elapsed_total = f"{elapsed_seconds} сек --- {format_hms(elapsed_seconds)}"
+        yield (
+            audio_filename,
+            gr.update(value=idx, maximum=total_parts, interactive=False),
+            elapsed_total,
+            start_time_str,
+            end_time_str,
+            None,
+            "",
+            gr.update(value=idx, maximum=total_parts, interactive=False),
+        )
+    # Після завершення – записати підсумок
+    total_elapsed_secs = int(time.time() - global_start)
+    total_formatted = format_hms(total_elapsed_secs)
+    finish_time_str = time.strftime('%H:%M:%S', time.localtime(time.time()))
+    print(f'Finished: {finish_time_str}, duration: {total_formatted}, parts: {len(events)}')
+    if warnings:
+        print('Warnings:')
+        for w in warnings:
+            print(f'  - {w}')
+    print(f"\033[92mЗатрачено часу: {total_formatted}\033[0m")
+    yield (
+        None,
+        gr.update(value=total_parts, maximum=total_parts, interactive=True),
+        f"Завершено за {total_elapsed_secs} сек",
+        start_time_str,
+        finish_time_str,
+        None,
+        "",
+        gr.update(value=total_parts, maximum=total_parts, interactive=False),
+    )
 save_choices = ['Зберегти всі частини озвученого тексту', 'Без збереження']
 
 with gr.Blocks(title="Batch TTS з Прогресом") as demo:
@@ -692,7 +903,8 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 remaining_time_text_d = gr.Textbox(label="Час до закінчення", interactive=False)
 
             # Підказка по синтаксису тегів і чекбокс ігнорування швидкості
-            gr.Markdown(
+            with gr.Accordion("Синтаксис тегів", open=False):
+                gr.Markdown(
                 """❗ **Синтаксис тегів:**  
 * `#gN текст` — озвучити текст голосом № N (N=1..30).  
 * `#gN_slow` / `#gN_fast` — встановити швидкість на 0.80 чи 1.20.  
@@ -930,18 +1142,14 @@ def batch_synthesize_dialog_events(
     global_start = time.time()
     # Прочитати текст з поля або файлу
     text = _read_text_source(text_input, file_path)
-    # Підготувати лог-файл
-    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime(global_start))
-    log_path = os.path.join(OUTPUT_DIR, f'log_{timestamp}.txt')
-    log_file = open(log_path, 'w', encoding='utf-8')
+    # Підготовка часу старту для консолі
     start_time_str = time.strftime('%H:%M:%S', time.localtime(global_start))
-    log_file.write(f'Start: {start_time_str}\n')
+    print(f'Start: {start_time_str}')
     # Парсинг сценарію у список подій
     try:
         events = parse_script_events(text, voices_flat)
     except Exception as e:
-        log_file.write(f'Error while parsing script: {e}\n')
-        log_file.close()
+        print(f'Error while parsing script: {e}')
         raise
     total_parts = max(1, len(events))
     times_per_part: List[float] = []
@@ -1033,9 +1241,8 @@ def batch_synthesize_dialog_events(
             try:
                 sr, audio_np = future.result()
             except Exception as e:
-                log_file.write(f'Error processing part {idx}: {e}\n')
-                log_file.flush()
-                log_file.close()
+                # Вивести помилку у консоль без запису у файл
+                print(f'Error processing part {idx}: {e}')
                 raise
         # Для першого voice запам'ятати частоту дискретизації
         if extra_info["type"] == "voice" and base_sr is None:
@@ -1048,16 +1255,12 @@ def batch_synthesize_dialog_events(
             txt_filename = os.path.join(OUTPUT_DIR, f"part_{idx:03}.txt")
             with open(txt_filename, 'w', encoding='utf-8') as txt_file:
                 txt_file.write(extra_info["text_body"])
-        # Записати інформацію у лог
+        # Вивести інформацію у консоль
         if extra_info["type"] == "voice":
-            log_file.write(
-                f'Part {idx}: type=voice, g={extra_info["g"]}, voice={extra_info["voice_name"]}, speed={extra_info["speed_eff"]:.2f}, text_len={extra_info["text_len"]}, path={audio_filename}\n'
-            )
+            print(f'Part {idx}: type=voice, g={extra_info["g"]}, voice={extra_info["voice_name"]}, speed={extra_info["speed_eff"]:.2f}, text_len={extra_info["text_len"]}, path={audio_filename}')
         else:
-            log_file.write(
-                f'Part {idx}: type=sfx, id={extra_info["sfx_id"]}, file={extra_info["file"]}, gain_db={extra_info["gain_db"]}, path={audio_filename}\n'
-            )
-        log_file.flush()
+            # Для SFX: друкуємо ідентифікатор і шлях до файлу
+            print(f'#{extra_info["sfx_id"]} --- файл "{extra_info["file"]}" -- {os.path.basename(audio_filename)}')
         # Оновити таймінги та UI
         part_end = time.time()
         times_per_part.append(part_end - part_start)
@@ -1078,12 +1281,11 @@ def batch_synthesize_dialog_events(
     total_elapsed_secs = int(time.time() - global_start)
     total_formatted = format_hms(total_elapsed_secs)
     finish_time_str = time.strftime('%H:%M:%S', time.localtime(time.time()))
-    log_file.write(f'Finished: {finish_time_str}, duration: {total_formatted}, parts: {len(events)}\n')
+    print(f'Finished: {finish_time_str}, duration: {total_formatted}, parts: {len(events)}')
     if warnings:
-        log_file.write('Warnings:\n')
+        print('Warnings:')
         for w in warnings:
-            log_file.write(f'  - {w}\n')
-    log_file.close()
+            print(f'  - {w}')
     print(f"\033[92mЗатрачено часу: {total_formatted}\033[0m")
     yield (
         None,

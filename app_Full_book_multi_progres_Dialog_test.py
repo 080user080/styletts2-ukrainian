@@ -21,7 +21,25 @@ try:
 except Exception:
     AutoTokenizer = None
 
-OUTPUT_DIR = "output_audio"
+from datetime import datetime
+
+# Base output directory. Final OUTPUT_DIR will include a timestamped subfolder
+OUTPUT_DIR_BASE = "output_audio"
+
+# Create a session-specific output folder: output_audio/YYYYMMDD_HHMMSS
+def make_session_output_dir(base: str = OUTPUT_DIR_BASE) -> str:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out = os.path.join(base, ts)
+    try:
+        os.makedirs(out, exist_ok=True)
+    except Exception:
+        # Fallback to base if creation fails
+        out = base
+        os.makedirs(out, exist_ok=True)
+    return out
+
+# Compute OUTPUT_DIR at import/run time so all writers use the same folder
+OUTPUT_DIR = make_session_output_dir()
 SPEAKER_MAX = 30
 PROGRESS_POLL_INTERVAL = 1.0
 
@@ -229,7 +247,9 @@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
     lines = normalize_text(text).splitlines()
     # pattern for voice events
     # Дозволити суфікси slow/fast з 1–3 цифрами (наприклад slow95, fast110)
-    voice_pat = re.compile(r'^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s+(.*)$', re.IGNORECASE)
+    # Підтримка формату з двокрапкою:   #g1: текст   або  #g2_fast95: текст
+    # Тобто після тега допускається необов'язкова двокрапка та/або пробіли.
+    voice_pat = re.compile(r"^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s*:??\s+(.*)$", re.IGNORECASE)
     # pattern for sfx events (identifier comprised of word characters)
     sfx_pat = re.compile(r'^#([A-Za-z0-9]+)\s*$', re.IGNORECASE)
     for line_no, raw_ln in enumerate(lines, start=1):
@@ -885,7 +905,8 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
                 remaining_time_text_d = gr.Textbox(label="Час до закінчення", interactive=False)
 
             # Підказка по синтаксису тегів і чекбокс ігнорування швидкості
-            gr.Markdown(
+            with gr.Accordion("Синтаксис тегів", open=False):
+                gr.Markdown(
                 """❗ **Синтаксис тегів:**  
 * `#gN текст` — озвучити текст голосом № N (N=1..30).  
 * `#gN_slow` / `#gN_fast` — встановити швидкість на 0.80 чи 1.20.  
@@ -893,8 +914,8 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
 * `#<sfx_id>` — вставити SFX із файлу `sfx.yaml`.  
 Порожні рядки та коментарі (`# ...`) ігноруються.  
 """
-            )
-            ignore_speed_chk_d = gr.Checkbox(label='Ігнорувати швидкість', value=False)
+                )
+                ignore_speed_chk_d = gr.Checkbox(label='Ігнорувати швидкість', value=False)
 
             # ПОВЕРНЕНІ КНОПКИ ЗБЕРЕЖЕННЯ/ЗАВАНТАЖЕННЯ (видимі зверху, поза спойлером)
             with gr.Row():
