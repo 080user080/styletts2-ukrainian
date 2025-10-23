@@ -56,14 +56,44 @@ def _load_sfx_config(path: str = "sfx.yaml") -> dict:
     cfg = {"normalize_dbfs": -16, "sounds": {}}
     try:
         if os.path.exists(path):
+            # Read YAML from given path
             with open(path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if isinstance(data, dict):
                     cfg.update(data)
+            # Save directory of the YAML for relative lookups (e.g. a "sound/" folder next to sfx.yaml)
+            cfg_dir = os.path.dirname(os.path.abspath(path))
+            if cfg_dir:
+                cfg.setdefault("_cfg_dir", cfg_dir)
     except Exception:
         # Fall back to default minimal config
         pass
     return cfg
+
+
+def get_sfx_config(path: str = "sfx.yaml") -> dict:
+    """
+    Read and return SFX configuration from YAML on demand.
+
+    Unlike _load_sfx_config which may be used once at startup, this helper
+    always (re)reads the YAML file so updates to sfx.yaml are picked up
+    without restarting the application.
+    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
+    """
+    out = {"normalize_dbfs": -16, "sounds": {}}
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if isinstance(data, dict):
+                    out.update(data)
+            # store directory for downstream file resolution
+            cfg_dir = os.path.dirname(os.path.abspath(path))
+            if cfg_dir:
+                out.setdefault("_cfg_dir", cfg_dir)
+    except Exception as e:
+        print(f"Warning: could not read SFX config '{path}': {e}")
+    return out
 
 # Global SFX configuration loaded once
 SFX_CONFIG = _load_sfx_config()
@@ -247,7 +277,9 @@ def parse_script_events(text: str, voices_flat: List[str]) -> List[dict]:
     lines = normalize_text(text).splitlines()
     # pattern for voice events
     # Дозволити суфікси slow/fast з 1–3 цифрами (наприклад slow95, fast110)
-    voice_pat = re.compile(r'^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s+(.*)$', re.IGNORECASE)
+    # Підтримка формату з двокрапкою:   #g1: текст   або  #g2_fast95: текст
+    # Тобто після тега допускається необов'язкова двокрапка та/або пробіли.
+    voice_pat = re.compile(r"^#g\s*([1-9]|[12][0-9]|30)(?:_((?:slow|fast)(?:\d{1,3})?))?\s*:??\s+(.*)$", re.IGNORECASE)
     # pattern for sfx events (identifier comprised of word characters)
     sfx_pat = re.compile(r'^#([A-Za-z0-9]+)\s*$', re.IGNORECASE)
     for line_no, raw_ln in enumerate(lines, start=1):
@@ -337,21 +369,41 @@ def _load_and_process_sfx(sfx_id: str, target_sr: int) -> Tuple[int, np.ndarray]
 
     Повертає (sample_rate, np.array)
     """
-    cfg = SFX_CONFIG.get('sounds', {}).get(sfx_id)
+    # Read current SFX config on demand so changes in sfx.yaml are picked up
+    cfg_all = get_sfx_config()
+    cfg = cfg_all.get('sounds', {}).get(sfx_id)
     if not cfg:
         raise RuntimeError(f"SFX конфігурація відсутня для id '{sfx_id}'")
     src_file = cfg.get('file')
     if not src_file:
         raise RuntimeError(f"Файл для SFX '{sfx_id}' не вказаний у конфігурації")
-    # Пошук файлу: спробуємо відносно каталогу, де лежить скрипт, або відносно OUTPUT_DIR
-    possible_paths = [src_file, os.path.join(os.getcwd(), src_file), os.path.join(OUTPUT_DIR, src_file)]
+    # Пошук файлу: спробуємо кілька варіантів
+    # 1) шлях як вказано у конфігу (може бути абсолютний)
+    # 2) відносно поточної робочої директорії
+    # 3) відносно OUTPUT_DIR
+    # 4) відносно директорії sfx.yaml (якщо відомо)
+    # 5) підпапка 'sound' поруч із sfx.yaml
+    possible_paths = [src_file]
+    possible_paths.append(os.path.join(os.getcwd(), src_file))
+    possible_paths.append(os.path.join(OUTPUT_DIR, src_file))
+    # якщо в конфігурації збережено шлях до директорії sfx.yaml, використовуємо його
+    cfg_dir = cfg_all.get("_cfg_dir")
+    if cfg_dir:
+        possible_paths.append(os.path.join(cfg_dir, src_file))
+        possible_paths.append(os.path.join(cfg_dir, "sound", src_file))
+    # також пробуємо відносно директорії скрипту
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else None
+    if script_dir:
+        possible_paths.append(os.path.join(script_dir, src_file))
+        possible_paths.append(os.path.join(script_dir, "sound", src_file))
     audio_path = None
     for p in possible_paths:
         if p and os.path.exists(p):
             audio_path = p
             break
     if not audio_path:
-        raise RuntimeError(f"Файл SFX '{src_file}' не знайдено (id: '{sfx_id}')")
+        tried = ", ".join([p for p in possible_paths if p])
+        raise RuntimeError(f"Файл SFX '{src_file}' не знайдено (id: '{sfx_id}'). Перевірені шляхи: {tried}")
     # Читання аудіо
     data, sr = sf.read(audio_path)
     # Перетворення у float32 та моно (якщо стерео)
@@ -367,8 +419,11 @@ def _load_and_process_sfx(sfx_id: str, target_sr: int) -> Tuple[int, np.ndarray]
             target_len = 1
         data = signal.resample(data, target_len)
         sr = target_sr
-    # Нормалізація гучності до normalize_dbfs
-    normalize_dbfs = SFX_CONFIG.get('normalize_dbfs')
+    # Нормалізація гучності до normalize_dbfs (можна вимкнути для конкретного SFX)
+    normalize_dbfs = cfg_all.get('normalize_dbfs')
+    # Якщо у конкретного ефекту явно вказано normalize: false — відключаємо нормалізацію
+    if cfg.get('normalize') is False:
+        normalize_dbfs = None
     # Поточний RMS та dBFS
     rms = math.sqrt(np.mean(data ** 2)) if data.size else 0.0
     if rms > 0:
@@ -912,8 +967,8 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
 * `#<sfx_id>` — вставити SFX із файлу `sfx.yaml`.  
 Порожні рядки та коментарі (`# ...`) ігноруються.  
 """
-            )
-            ignore_speed_chk_d = gr.Checkbox(label='Ігнорувати швидкість', value=False)
+                )
+                ignore_speed_chk_d = gr.Checkbox(label='Ігнорувати швидкість', value=False)
 
             # ПОВЕРНЕНІ КНОПКИ ЗБЕРЕЖЕННЯ/ЗАВАНТАЖЕННЯ (видимі зверху, поза спойлером)
             with gr.Row():
