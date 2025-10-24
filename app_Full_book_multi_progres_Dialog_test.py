@@ -53,65 +53,48 @@ def _load_sfx_config(path: str = "sfx.yaml") -> dict:
     Load SFX configuration from YAML. If the file does not exist or is invalid,
     return a minimal default configuration.
     """
+    # Вимоги: шукати лише у пріоритетному порядку:
+    # 1) ./sfx.yaml
+    # 2) ./sound/sfx.yaml
     cfg = {"normalize_dbfs": -16, "sounds": {}}
+    candidates = [
+        os.path.join(os.getcwd(), "sfx.yaml"),
+        os.path.join(os.getcwd(), "sound", "sfx.yaml"),
+    ]
+    found = None
+    for p in candidates:
+        if os.path.exists(p):
+            found = p
+            break
+    if not found:
+        return cfg
     try:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                if isinstance(data, dict):
-                    cfg.update(data)
+        with open(found, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                cfg.update(data)
+        cfg["_cfg_dir"] = os.path.dirname(found)
     except Exception:
-        # Fall back to default minimal config
+        # якщо не вдалось прочитати — повернути дефолт
         pass
     return cfg
 
 
-def get_sfx_config(path: str = "sfx.yaml") -> dict:
+def get_sfx_config() -> dict:
     """
-    Read and return SFX configuration from YAML on demand.
+    (Динамічне) читання sfx.yaml на вимогу.
 
-    Unlike _load_sfx_config which may be used once at startup, this helper
-    always (re)reads the YAML file so updates to sfx.yaml are picked up
-    without restarting the application.
-    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
+    Виконує пошук ТІЛЬКИ у:
+      1) ./sfx.yaml
+      2) ./sound/sfx.yaml
+
+    Повертає конфіг з мінімальними ключами 'normalize_dbfs' та 'sounds'.
+    Додає '_cfg_dir' — директорію де знайдено sfx.yaml.
     """
-    out = {"normalize_dbfs": -16, "sounds": {}}
-    try:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                if isinstance(data, dict):
-                    out.update(data)
-    except Exception as e:
-        print(f"Warning: could not read SFX config '{path}': {e}")
-    return out
+    return _load_sfx_config()
 
-
-def get_sfx_config(path: str = "sfx.yaml") -> dict:
-    """
-    Read and return SFX configuration from YAML on demand.
-
-    Unlike _load_sfx_config which may be used once at startup, this helper
-    always (re)reads the YAML file so updates to sfx.yaml are picked up
-    without restarting the application.
-    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
-    """
-    out = {"normalize_dbfs": -16, "sounds": {}}
-    try:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                if isinstance(data, dict):
-                    out.update(data)
-            # store directory for downstream file resolution
-            cfg_dir = os.path.dirname(os.path.abspath(path))
-            if cfg_dir:
-                out.setdefault("_cfg_dir", cfg_dir)
-    except Exception as e:
-        print(f"Warning: could not read SFX config '{path}': {e}")
-    return out
-
-# Global SFX configuration loaded once
+# Global SFX configuration loaded once at import.
+# Note: UI "Розпочати" викликає перезавантаження конфігурації перед стартом.
 SFX_CONFIG = _load_sfx_config()
 DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
 
@@ -1143,7 +1126,16 @@ with gr.Blocks(title="Batch TTS з Прогресом") as demo:
             )
 
             def _btn_d_handler(text_input, file_input, *flat_values):
+                # Перед початком роботи за вимогою: перезавантажити конфіг sfx.yaml
                 # flat_values: 30 speed sliders, 30 voice dropdowns, save_option, ignore_speed flag
+                global SFX_CONFIG, DEFAULT_SPEED
+                try:
+                    SFX_CONFIG = get_sfx_config()
+                    DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
+                except Exception as e:
+                    # на випадок помилки читання — лишаємо попередні значення і логируемо повідомляємо
+                    print(f"Warning: не вдалося перезавантажити sfx.yaml: {e}")
+
                 speeds = list(flat_values[:30])
                 voices = list(flat_values[30:60])
                 save_option = flat_values[60] if len(flat_values) > 60 else None

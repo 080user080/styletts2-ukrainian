@@ -1,73 +1,139 @@
-*** Begin Patch
-*** Update File: app_Full_book_multi_progres_Dialog_test.py
+---/"app_Full_book_multi_progres_Dialog_test.py"
++++/"app_Full_book_multi_progres_Dialog_test.py"
 @@
--def _load_sfx_config(path: str = "sfx.yaml") -> dict:
-+def _load_sfx_config(path: str = "sfx.yaml") -> dict:
-@@
+ def _load_sfx_config(path: str = "sfx.yaml") -> dict:
+     """
+     Load SFX configuration from YAML. If the file does not exist or is invalid,
+     return a minimal default configuration.
+     """
+-    cfg = {"normalize_dbfs": -16, "sounds": {}}
 -    try:
 -        if os.path.exists(path):
 -            with open(path, "r", encoding="utf-8") as f:
 -                data = yaml.safe_load(f)
 -                if isinstance(data, dict):
 -                    cfg.update(data)
+-    except Exception:
+-        # Fall back to default minimal config
+-        pass
+-    return cfg
++    # Вимоги: шукати лише у пріоритетному порядку:
++    # 1) ./sfx.yaml
++    # 2) ./sound/sfx.yaml
++    cfg = {"normalize_dbfs": -16, "sounds": {}}
++    candidates = [
++        os.path.join(os.getcwd(), "sfx.yaml"),
++        os.path.join(os.getcwd(), "sound", "sfx.yaml"),
++    ]
++    found = None
++    for p in candidates:
++        if os.path.exists(p):
++            found = p
++            break
++    if not found:
++        return cfg
 +    try:
-+        if os.path.exists(path):
-+            # Read YAML from given path
-+            with open(path, "r", encoding="utf-8") as f:
-+                data = yaml.safe_load(f)
-+                if isinstance(data, dict):
-+                    cfg.update(data)
-+            # Save directory of the YAML for relative lookups (e.g. a "sound/" folder next to sfx.yaml)
-+            cfg_dir = os.path.dirname(os.path.abspath(path))
-+            if cfg_dir:
-+                cfg.setdefault("_cfg_dir", cfg_dir)
++        with open(found, "r", encoding="utf-8") as f:
++            data = yaml.safe_load(f)
++            if isinstance(data, dict):
++                cfg.update(data)
++        cfg["_cfg_dir"] = os.path.dirname(found)
++    except Exception:
++        # якщо не вдалось прочитати — повернути дефолт
++        pass
++    return cfg
 @@
- def get_sfx_config(path: str = "sfx.yaml") -> dict:
-@@
+-def get_sfx_config(path: str = "sfx.yaml") -> dict:
+-    """
+-    Read and return SFX configuration from YAML on demand.
+-
+-    Unlike _load_sfx_config which may be used once at startup, this helper
+-    always (re)reads the YAML file so updates to sfx.yaml are picked up
+-    without restarting the application.
+-    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
+-    """
+-    out = {"normalize_dbfs": -16, "sounds": {}}
 -    try:
 -        if os.path.exists(path):
 -            with open(path, "r", encoding="utf-8") as f:
 -                data = yaml.safe_load(f)
 -                if isinstance(data, dict):
 -                    out.update(data)
-+    try:
-+        if os.path.exists(path):
-+            with open(path, "r", encoding="utf-8") as f:
-+                data = yaml.safe_load(f)
-+                if isinstance(data, dict):
-+                    out.update(data)
-+            # store directory for downstream file resolution
-+            cfg_dir = os.path.dirname(os.path.abspath(path))
-+            if cfg_dir:
-+                out.setdefault("_cfg_dir", cfg_dir)
+-    except Exception as e:
+-        print(f"Warning: could not read SFX config '{path}': {e}")
+-    return out
+-
+-
+-def get_sfx_config(path: str = "sfx.yaml") -> dict:
+-    """
+-    Read and return SFX configuration from YAML on demand.
+-
+-    Unlike _load_sfx_config which may be used once at startup, this helper
+-    always (re)reads the YAML file so updates to sfx.yaml are picked up
+-    without restarting the application.
+-    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
+-    """
+-    out = {"normalize_dbfs": -16, "sounds": {}}
+-    try:
+-        if os.path.exists(path):
+-            with open(path, "r", encoding="utf-8") as f:
+-                data = yaml.safe_load(f)
+-                if isinstance(data, dict):
+-                    out.update(data)
+-            # store directory for downstream file resolution
+-            cfg_dir = os.path.dirname(os.path.abspath(path))
+-            if cfg_dir:
+-                out.setdefault("_cfg_dir", cfg_dir)
+-    except Exception as e:
+-        print(f"Warning: could not read SFX config '{path}': {e}")
+-    return out
++def get_sfx_config() -> dict:
++    """
++    (Динамічне) читання sfx.yaml на вимогу.
++
++    Виконує пошук ТІЛЬКИ у:
++      1) ./sfx.yaml
++      2) ./sound/sfx.yaml
++
++    Повертає конфіг з мінімальними ключами 'normalize_dbfs' та 'sounds'.
++    Додає '_cfg_dir' — директорію де знайдено sfx.yaml.
++    """
++    return _load_sfx_config()
 @@
- def _load_and_process_sfx(sfx_id: str, target_sr: int) -> Tuple[int, np.ndarray]:
+-# Global SFX configuration loaded once
+-SFX_CONFIG = _load_sfx_config()
+-DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
++# Global SFX configuration loaded once at import.
++# Note: UI "Розпочати" викликає перезавантаження конфігурації перед стартом.
++SFX_CONFIG = _load_sfx_config()
++DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
 @@
--    # Пошук файлу: спробуємо відносно каталогу, де лежить скрипт, або відносно OUTPUT_DIR
--    possible_paths = [src_file, os.path.join(os.getcwd(), src_file), os.path.join(OUTPUT_DIR, src_file)]
-+    # Пошук файлу: спробуємо кілька варіантів
-+    # 1) шлях як вказано у конфігу (може бути абсолютний)
-+    # 2) відносно поточної робочої директорії
-+    # 3) відносно OUTPUT_DIR
-+    # 4) відносно директорії sfx.yaml (якщо відомо)
-+    # 5) підпапка 'sound' поруч із sfx.yaml
-+    possible_paths = [src_file]
-+    possible_paths.append(os.path.join(os.getcwd(), src_file))
-+    possible_paths.append(os.path.join(OUTPUT_DIR, src_file))
-+    # якщо в конфігурації збережено шлях до директорії sfx.yaml, використовуємо його
-+    cfg_dir = cfg_all.get("_cfg_dir")
-+    if cfg_dir:
-+        possible_paths.append(os.path.join(cfg_dir, src_file))
-+        possible_paths.append(os.path.join(cfg_dir, "sound", src_file))
-+    # також пробуємо відносно директорії скрипту
-+    script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else None
-+    if script_dir:
-+        possible_paths.append(os.path.join(script_dir, src_file))
-+        possible_paths.append(os.path.join(script_dir, "sound", src_file))
-@@
--    if not audio_path:
--        raise RuntimeError(f"Файл SFX '{src_file}' не знайдено (id: '{sfx_id}')")
-+    if not audio_path:
-+        tried = ", ".join([p for p in possible_paths if p])
-+        raise RuntimeError(f"Файл SFX '{src_file}' не знайдено (id: '{sfx_id}'). Перевірені шляхи: {tried}")
-*** End Patch
+-            def _btn_d_handler(text_input, file_input, *flat_values):
+-                # flat_values: 30 speed sliders, 30 voice dropdowns, save_option, ignore_speed flag
+-                speeds = list(flat_values[:30])
+-                voices = list(flat_values[30:60])
+-                save_option = flat_values[60] if len(flat_values) > 60 else None
+-                ignore_speed = bool(flat_values[61]) if len(flat_values) > 61 else False
+-                yield from batch_synthesize_dialog_events(text_input, file_input, speeds, voices, save_option, ignore_speed)
++            def _btn_d_handler(text_input, file_input, *flat_values):
++                # Перед початком роботи за вимогою: перезавантажити конфіг sfx.yaml
++                # flat_values: 30 speed sliders, 30 voice dropdowns, save_option, ignore_speed flag
++                global SFX_CONFIG, DEFAULT_SPEED
++                try:
++                    SFX_CONFIG = get_sfx_config()
++                    DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
++                except Exception as e:
++                    # на випадок помилки читання — лишаємо попередні значення і логируемо повідомляємо
++                    print(f"Warning: не вдалося перезавантажити sfx.yaml: {e}")
++
++                speeds = list(flat_values[:30])
++                voices = list(flat_values[30:60])
++                save_option = flat_values[60] if len(flat_values) > 60 else None
++                ignore_speed = bool(flat_values[61]) if len(flat_values) > 61 else False
++                yield from batch_synthesize_dialog_events(text_input, file_input, speeds, voices, save_option, ignore_speed)
+             btn_d.click(
+                 fn=_btn_d_handler,
+                 inputs=btn_inputs,
+                 outputs=btn_outputs,
+                 show_progress=False
+             )

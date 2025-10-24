@@ -1,4 +1,4 @@
-﻿import os
+import os
 import time
 import re
 import unicodedata
@@ -56,19 +56,35 @@ def _load_sfx_config(path: str = "sfx.yaml") -> dict:
     cfg = {"normalize_dbfs": -16, "sounds": {}}
     try:
         if os.path.exists(path):
-            # Read YAML from given path
             with open(path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if isinstance(data, dict):
                     cfg.update(data)
-            # Save directory of the YAML for relative lookups (e.g. a "sound/" folder next to sfx.yaml)
-            cfg_dir = os.path.dirname(os.path.abspath(path))
-            if cfg_dir:
-                cfg.setdefault("_cfg_dir", cfg_dir)
     except Exception:
         # Fall back to default minimal config
         pass
     return cfg
+
+
+def get_sfx_config(path: str = "sfx.yaml") -> dict:
+    """
+    Read and return SFX configuration from YAML on demand.
+
+    Unlike _load_sfx_config which may be used once at startup, this helper
+    always (re)reads the YAML file so updates to sfx.yaml are picked up
+    without restarting the application.
+    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
+    """
+    out = {"normalize_dbfs": -16, "sounds": {}}
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if isinstance(data, dict):
+                    out.update(data)
+    except Exception as e:
+        print(f"Warning: could not read SFX config '{path}': {e}")
+    return out
 
 
 def get_sfx_config(path: str = "sfx.yaml") -> dict:
