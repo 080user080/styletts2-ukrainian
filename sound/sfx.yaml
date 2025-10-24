@@ -16,7 +16,7 @@ sounds:
 
   r:
     file: "Розділ.mp3"
-    gain_db: -30
+    gain_db: 0
     normalize: true
   steps:
     file: "кроки.mp3"
@@ -44,9 +44,25 @@ sounds:
     normalize: false
   ds:
     file: "скрипучі двері.mp3"
-    gain_db: 0
-    normalize: false
+    gain_db: -20
+    normalize: true
   vodakup:
     file: "шипіння води.mp3"
     gain_db: 0
     normalize: false
+  podux1:
+    file: "важке дихання чол.mp3"
+    gain_db: 0
+    normalize: false
+  podux2:
+    file: "важке дихання чол.mp3"
+    gain_db: -35
+    normalize: true
+  plach:
+    file: "плач.mp3"
+    gain_db: -25
+    normalize: true
+  cmix:
+    file: "сміх чол один.mp3"
+    gain_db: -20
+    normalize: true
