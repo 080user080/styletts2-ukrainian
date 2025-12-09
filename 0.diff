@@ -1,139 +1,72 @@
----/"app_Full_book_multi_progres_Dialog_test.py"
-+++/"app_Full_book_multi_progres_Dialog_test.py"
-@@
- def _load_sfx_config(path: str = "sfx.yaml") -> dict:
-     """
-     Load SFX configuration from YAML. If the file does not exist or is invalid,
-     return a minimal default configuration.
-     """
--    cfg = {"normalize_dbfs": -16, "sounds": {}}
--    try:
--        if os.path.exists(path):
--            with open(path, "r", encoding="utf-8") as f:
--                data = yaml.safe_load(f)
--                if isinstance(data, dict):
--                    cfg.update(data)
--    except Exception:
--        # Fall back to default minimal config
--        pass
--    return cfg
-+    # Вимоги: шукати лише у пріоритетному порядку:
-+    # 1) ./sfx.yaml
-+    # 2) ./sound/sfx.yaml
-+    cfg = {"normalize_dbfs": -16, "sounds": {}}
-+    candidates = [
-+        os.path.join(os.getcwd(), "sfx.yaml"),
-+        os.path.join(os.getcwd(), "sound", "sfx.yaml"),
-+    ]
-+    found = None
-+    for p in candidates:
-+        if os.path.exists(p):
-+            found = p
-+            break
-+    if not found:
-+        return cfg
-+    try:
-+        with open(found, "r", encoding="utf-8") as f:
-+            data = yaml.safe_load(f)
-+            if isinstance(data, dict):
-+                cfg.update(data)
-+        cfg["_cfg_dir"] = os.path.dirname(found)
-+    except Exception:
-+        # якщо не вдалось прочитати — повернути дефолт
-+        pass
-+    return cfg
-@@
--def get_sfx_config(path: str = "sfx.yaml") -> dict:
--    """
--    Read and return SFX configuration from YAML on demand.
--
--    Unlike _load_sfx_config which may be used once at startup, this helper
--    always (re)reads the YAML file so updates to sfx.yaml are picked up
--    without restarting the application.
--    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
--    """
--    out = {"normalize_dbfs": -16, "sounds": {}}
--    try:
--        if os.path.exists(path):
--            with open(path, "r", encoding="utf-8") as f:
--                data = yaml.safe_load(f)
--                if isinstance(data, dict):
--                    out.update(data)
--    except Exception as e:
--        print(f"Warning: could not read SFX config '{path}': {e}")
--    return out
--
--
--def get_sfx_config(path: str = "sfx.yaml") -> dict:
--    """
--    Read and return SFX configuration from YAML on demand.
--
--    Unlike _load_sfx_config which may be used once at startup, this helper
--    always (re)reads the YAML file so updates to sfx.yaml are picked up
--    without restarting the application.
--    Returns a dict with at least keys: 'normalize_dbfs' and 'sounds'.
--    """
--    out = {"normalize_dbfs": -16, "sounds": {}}
--    try:
--        if os.path.exists(path):
--            with open(path, "r", encoding="utf-8") as f:
--                data = yaml.safe_load(f)
--                if isinstance(data, dict):
--                    out.update(data)
--            # store directory for downstream file resolution
--            cfg_dir = os.path.dirname(os.path.abspath(path))
--            if cfg_dir:
--                out.setdefault("_cfg_dir", cfg_dir)
--    except Exception as e:
--        print(f"Warning: could not read SFX config '{path}': {e}")
--    return out
-+def get_sfx_config() -> dict:
-+    """
-+    (Динамічне) читання sfx.yaml на вимогу.
-+
-+    Виконує пошук ТІЛЬКИ у:
-+      1) ./sfx.yaml
-+      2) ./sound/sfx.yaml
-+
-+    Повертає конфіг з мінімальними ключами 'normalize_dbfs' та 'sounds'.
-+    Додає '_cfg_dir' — директорію де знайдено sfx.yaml.
-+    """
-+    return _load_sfx_config()
-@@
--# Global SFX configuration loaded once
--SFX_CONFIG = _load_sfx_config()
--DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
-+# Global SFX configuration loaded once at import.
-+# Note: UI "Розпочати" викликає перезавантаження конфігурації перед стартом.
-+SFX_CONFIG = _load_sfx_config()
-+DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
-@@
--            def _btn_d_handler(text_input, file_input, *flat_values):
--                # flat_values: 30 speed sliders, 30 voice dropdowns, save_option, ignore_speed flag
--                speeds = list(flat_values[:30])
--                voices = list(flat_values[30:60])
--                save_option = flat_values[60] if len(flat_values) > 60 else None
--                ignore_speed = bool(flat_values[61]) if len(flat_values) > 61 else False
--                yield from batch_synthesize_dialog_events(text_input, file_input, speeds, voices, save_option, ignore_speed)
-+            def _btn_d_handler(text_input, file_input, *flat_values):
-+                # Перед початком роботи за вимогою: перезавантажити конфіг sfx.yaml
-+                # flat_values: 30 speed sliders, 30 voice dropdowns, save_option, ignore_speed flag
-+                global SFX_CONFIG, DEFAULT_SPEED
-+                try:
-+                    SFX_CONFIG = get_sfx_config()
-+                    DEFAULT_SPEED = float(SFX_CONFIG.get("default_speed", DEFAULT_SPEED_CODE))
-+                except Exception as e:
-+                    # на випадок помилки читання — лишаємо попередні значення і логируемо повідомляємо
-+                    print(f"Warning: не вдалося перезавантажити sfx.yaml: {e}")
-+
-+                speeds = list(flat_values[:30])
-+                voices = list(flat_values[30:60])
-+                save_option = flat_values[60] if len(flat_values) > 60 else None
-+                ignore_speed = bool(flat_values[61]) if len(flat_values) > 61 else False
-+                yield from batch_synthesize_dialog_events(text_input, file_input, speeds, voices, save_option, ignore_speed)
-             btn_d.click(
-                 fn=_btn_d_handler,
-                 inputs=btn_inputs,
-                 outputs=btn_outputs,
-                 show_progress=False
+@@ -728,13 +713,6 @@
+                 outputs=save_settings_download_btn_top,
              )
+
+-            def save_speaker_settings_to_default(*flat_values):
+-                voices = list(flat_values[:30])
+-                speeds = list(flat_values[30:60])
+-                os.makedirs(OUTPUT_DIR, exist_ok=True)
+-                cfg_path = os.path.join(OUTPUT_DIR, "speakers_settings.txt")
+-                with open(cfg_path, "w", encoding="utf-8") as f:
+-                    for i in range(1, 31):
+                         voice_name = str(voices[i-1]).strip()
+                         try:
+                             speed_val = float(speeds[i-1])
+@@ -754,54 +732,6 @@
+                 outputs=[],
+             )
+
+-            def load_speaker_settings_uploaded(files, *current_values):
+-                """Імпортує значення з файлу у форматі #gN:Назва голосу швидкість:0,88;"""
+-                if not files:
+-                    raise gr.Error("Не обрано файл налаштувань (.txt).")
+-                
+-                # Обробка шляху файлу
+-                if isinstance(files, (list, tuple)):
+-                    src = files[0]
+-                else:
+-                    src = files
+-                file_path = str(src if isinstance(src, str) else 
+-                              (src.get("name") or src.get("path") if isinstance(src, dict) else 
+-                               getattr(src, "name", ""))) or None
+-                if not file_path: 
+-                    raise gr.Error("Не вдалося визначити шлях до завантаженого файлу.")
+
+-                # Регулярний вираз для парсингу
+-                pat = re.compile(
+-                    r'^#g([1-9]|[12]\d|30)\s*:\s*(.*?)\s*швидкість\s*:\s*([0-9]+(?:[.,][0-9]+)?)\s*;\s*$',
+-                    re.IGNORECASE
+-                )
+-                
+-                # Початкові значення
+-                voices_out = list(current_values[:30])
+-                speeds_out = list(current_values[30:60])
+
+-                # Читання файлу
+-                for line in open(file_path, "r", encoding="utf-8").read().splitlines():
+-                    m = pat.match(line.strip())
+-                    if not m:
+-                        continue
+-                    idx = int(m.group(1)) - 1
+-                    voice_name = m.group(2).strip()
+-                    speed_raw = m.group(3).replace(",", ".")
+-                    try:
+-                        speed_val = float(speed_raw)
+-                    except Exception:
+-                        speed_val = speeds_out[idx] if 0 <= idx < len(speeds_out) else 1.0
+-                    # Обмеження меж повзунка
+-                    speed_val = max(0.7, min(1.3, speed_val))
+-                    if 0 <= idx < 30:
+-                        voices_out[idx] = voice_name
+-                        speeds_out[idx] = speed_val
+-                return voices_out + speeds_out
+
+-            # Кнопки завантаження
+-            load_settings_btn.upload(
+-                fn=load_speaker_settings_uploaded,
+-                inputs=[load_settings_btn] + voice_components + speed_components,
+-                outputs=voice_components + speed_components,
+-            )
+             load_settings_btn_top.upload(
+                 fn=load_speaker_settings_uploaded,
+                 inputs=[load_settings_btn_top] + voice_components + speed_components,

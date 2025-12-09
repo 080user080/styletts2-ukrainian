@@ -1,0 +1,8 @@
+shared:
+  input_dir: "./input"
+  output_dir: "./output"
+google_translator:
+  project_id: ""
+  location: "global"
+ukrainian_tts:
+  prompt_audio: "./voices/Марина Панас.wav"

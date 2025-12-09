@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  synth:
+    image: bogdanpasichnyk/synthesize:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./input:/usr/src/app/input:ro
+      - ./output:/usr/src/app/output
+    working_dir: /usr/src/app
+    command: []
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

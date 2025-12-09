@@ -1,0 +1,6 @@
+from typing import Protocol
+
+class TTSServiceInterface(Protocol):
+    def synthesize(self, text: str, max_duration: float | None = None): ...
+
+    def synthesize_to_file(self, text: str, output_path: str, max_duration: float | None = None) -> None: ...

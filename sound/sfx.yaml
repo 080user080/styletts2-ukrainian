@@ -66,3 +66,23 @@ sounds:
     file: "сміх чол один.mp3"
     gain_db: -20
     normalize: true
+  cmix1:
+    file: "розсмішив.mp3"
+    gain_db: -25
+    normalize: true
+  kik:
+    file: "удар.mp3"
+    gain_db: 0
+    normalize: false
+  wind:
+    file: "вітер.mp3"
+    gain_db: 0
+    normalize: false
+  fire:
+    file: "вогонь.mp3"
+    gain_db: 0
+    normalize: false
+  ydarm:
+    file: "Удар мечем_молотком.wav"
+    gain_db: 0
+    normalize: false

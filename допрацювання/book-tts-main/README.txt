@@ -1,0 +1,29 @@
+source venv/bin/activate
+
+python src/main.py tts-book biohimichni_osnovi_fkis
+
+pip install --upgrade --force-reinstall --no-cache-dir -r requirements.txt
+
+python src/app.py --input ./input/test.txt --verbalize --replace --voice "Олег Лепенець"
+
+docker-compose run --rm synth --input ./input/test.txt --verbalize --replace --voice "Олег Лепенець"
+
+docker build -f ./Dockerfile  -t bogdanpasichnyk/synthesize .
+
+docker run --rm --gpus all \
+  -v "$(pwd)/input":/usr/src/app/input \
+  -v "$(pwd)/output":/usr/src/app/output \
+  bogdanpasichnyk/synthesize \
+  --input ./input/test.txt \
+  --verbalize --replace \
+  --voice "Олег Лепенець"
+
+python src/app.py --input ./input/Power-and-Progress.ukr.txt --verbalize --voice "Матвій Ніколаєв"
+
+export GOOGLE_APPLICATION_CREDENTIALS="/mnt/c/Users/pasec/PhpstormProjects/test/home-assistant-430910-13c3a7332c96.json"
+
+python src/google/transtale.py input/eng/The_Coming_Wave.txt input/The_Coming_Wave.txt --project-id home-assistant-430910 --source-lang en --target-lang uk
+
+python src/google/app.py --input ./input/The-Singularity-is-Nearer.ukr.txt --voice "Laomedeia"
+
+python src/app.py --input ./input/Power-and-Progress.ukr.txt --verbalize --replace --voice "Вячеслав Дудко"
