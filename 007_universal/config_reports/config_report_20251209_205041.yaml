@@ -1,0 +1,239 @@
+current_config:
+  app:
+    mode: DEBUG
+    name: Мій Модульний Проєкт
+    version: 1.0.0
+  error_handler:
+    enabled: true
+    log_errors: true
+    max_error_length: 1000
+    retry_count: 0
+    skip_failed_modules: true
+  events:
+    enabled: true
+    log_level: INFO
+  gradio_main:
+    analytics_enabled: false
+    enabled: true
+    port: 7860
+    server_name: 0.0.0.0
+    share: false
+  gradio_ui:
+    analytics_enabled: false
+    height: 600
+    port: 7860
+    server_name: 0.0.0.0
+    share: false
+    show_error: true
+    theme: default
+    width: 100%
+  gui_manager:
+    autostart: true
+    available_guis:
+    - gradio
+    default_gui: gradio
+    enabled: true
+    port_range_end: 7890
+    port_range_start: 7860
+  logging:
+    file: logs/app.log
+    level: INFO
+    rotation_size_mb: 1
+  note: Цей файл має найвищий пріоритет. Редагуйте його для налаштувань.
+  processing:
+    max_sentence_length: 200
+    normalize_unicode: true
+    preserve_plus_symbols: true
+    remove_control_chars: true
+    split_by_sentences: true
+  registry:
+    allow_overwrite: false
+    enabled: true
+    validate_callbacks: true
+  sfx:
+    default_speed: 0.88
+    default_sr: 24000
+    normalize_dbfs: -16
+    sounds: {}
+  tts:
+    autoplay: false
+    autosave: true
+    char_cap: 1200
+    default_speed: 0.88
+    enabled: true
+    max_tokens: 280
+    normalize_volume: true
+    output_dir: output_audio
+    progress_poll_interval: 1.0
+    sample_rate: 24000
+    sfx_config_path: sfx.yaml
+    sfx_enabled: true
+    speaker_max: 30
+    target_dbfs: -16
+  tts_models:
+    device: auto
+    enabled: true
+    multi_model_path: patriotyk/styletts2_ukrainian_multispeaker
+    prompts_dir: voices
+    single_model_path: patriotyk/styletts2_ukrainian_single
+    single_style_path: filatov.pt
+  universal_deps_checker:
+    auto_install: false
+    check_on_start: true
+    enabled: true
+    log_level: INFO
+    required_packages: {}
+    skip_packages:
+    - typing
+    - collections
+    - dataclasses
+    - pathlib
+    - os
+    - sys
+    - logging
+    - json
+    - yaml
+    - time
+    - datetime
+    - re
+    - math
+    - random
+  verbalizer:
+    device: auto
+    enabled: true
+    model_name: skypro1111/mbart-large-50-verbalization
+module_defaults:
+  error_handler:
+    enabled: true
+    log_errors: true
+    max_error_length: 1000
+    retry_count: 0
+    skip_failed_modules: true
+  events:
+    enabled: true
+    log_level: INFO
+  gradio_main:
+    analytics_enabled: false
+    enabled: true
+    port: 7860
+    server_name: 0.0.0.0
+    share: false
+  gradio_ui:
+    analytics_enabled: false
+    height: 600
+    port: 7860
+    server_name: 0.0.0.0
+    share: false
+    show_error: true
+    theme: default
+    width: 100%
+  gui_manager:
+    autostart: true
+    available_guis:
+    - gradio
+    default_gui: gradio
+    enabled: true
+    port_range_end: 7890
+    port_range_start: 7860
+  logging:
+    file: logs/app.log
+    level: INFO
+    rotation_size_mb: 1
+  processing:
+    max_sentence_length: 200
+    normalize_unicode: true
+    preserve_plus_symbols: true
+    remove_control_chars: true
+    split_by_sentences: true
+  registry:
+    allow_overwrite: false
+    enabled: true
+    validate_callbacks: true
+  sfx:
+    default_speed: 0.88
+    default_sr: 24000
+    normalize_dbfs: -16
+    sounds: {}
+  tts:
+    autoplay: false
+    autosave: true
+    char_cap: 1200
+    default_speed: 0.88
+    enabled: true
+    max_tokens: 280
+    normalize_volume: true
+    output_dir: output_audio
+    progress_poll_interval: 1.0
+    sample_rate: 24000
+    sfx_config_path: sfx.yaml
+    sfx_enabled: true
+    speaker_max: 30
+    target_dbfs: -16
+  tts_models:
+    device: auto
+    enabled: true
+    multi_model_path: patriotyk/styletts2_ukrainian_multispeaker
+    prompts_dir: voices
+    single_model_path: patriotyk/styletts2_ukrainian_single
+    single_style_path: filatov.pt
+  universal_deps_checker:
+    auto_install: false
+    check_on_start: true
+    enabled: true
+    log_level: INFO
+    required_packages: {}
+    skip_packages:
+    - typing
+    - collections
+    - dataclasses
+    - pathlib
+    - os
+    - sys
+    - logging
+    - json
+    - yaml
+    - time
+    - datetime
+    - re
+    - math
+    - random
+  verbalizer:
+    device: auto
+    enabled: true
+    model_name: skypro1111/mbart-large-50-verbalization
+notes:
+- Цей звіт генерується автоматично
+- Зміни в config.yaml відбуваються при додаванні нових модулів
+- Існуючі налаштування користувача не перезаписуються
+summary:
+  all_sections:
+  - app
+  - error_handler
+  - events
+  - gradio_ui
+  - gui_manager
+  - logging
+  - note
+  - processing
+  - registry
+  - sfx
+  - tts
+  - universal_deps_checker
+  - verbalizer
+  - tts_models
+  - gradio_main
+  sections_from_modules:
+  - universal_deps_checker
+  - error_handler
+  - events
+  - registry
+  - gui_manager
+  - logging
+  - verbalizer
+  - tts_models
+  - gradio_main
+  - tts
+  - sfx
+  - gradio_ui
+  - processing
+  total_sections: 15

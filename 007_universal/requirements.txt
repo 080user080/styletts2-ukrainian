@@ -1,0 +1,1 @@
+requirements.txtНеобхідні бібліотеки Python для запуску проєкту.Встановіть їх командою: pip install -r requirements.txtДля завантаження та парсингу config.yamlPyYAMLДля валідації конфігурації у 001_config.pypydantic

@@ -1,0 +1,245 @@
+# Файл: kod/p_000_loader.py
+"""
+Модуль P_000: ModuleLoader (REVISED)
+Реалізує повний життєвий цикл: Сканування -> Конфігурація -> Ініціалізація -> Зупинка.
+"""
+import os
+import importlib
+import inspect
+import sys
+from typing import Dict, Any, List, Optional, Union
+from dataclasses import dataclass
+from pathlib import Path
+from pydantic import BaseModel
+import yaml
+import logging
+
+ROOT_LOGGER_NAME = "modular_project"
+# Тимчасовий логер для самого завантажувача
+INTERNAL_LOGGER = logging.getLogger("Loader")
+
+@dataclass
+class ModuleInfo:
+    prefix: int
+    name: str
+    filepath: Path
+    import_name: str
+    module_object: Optional[Any] = None # Посилання на завантажений модуль
+
+class ModuleLoader:
+    def __init__(self):
+        self.app_context: Dict[str, Any] = {
+            'config_models': {},
+            'raw_config': {}
+        }
+        # Визначаємо кореневі шляхи
+        self.project_root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.kod_path = self.project_root / "kod"
+        self.config_filepath = self.project_root / "config.yaml"
+        self.config_dir = self.project_root / "config"
+        
+        self.modules: List[ModuleInfo] = []
+        self.initialized_modules: List[ModuleInfo] = [] # Для зворотного порядку stop()
+        self.error_handler = None
+        self.deps_checker = None
+
+    def _scan_modules(self) -> List[ModuleInfo]:
+        """Сканує директорію kod/."""
+        found_modules = []
+        for fpath in self.kod_path.glob("**/p_[0-9][0-9][0-9]_*.py"):
+            if fpath.name == Path(__file__).name: continue
+            
+            try:
+                prefix = int(fpath.name[2:5])
+            except ValueError:
+                continue
+
+            relative_path = fpath.relative_to(self.project_root)
+            import_name = ".".join(relative_path.parts).replace(".py", "")
+
+            found_modules.append(ModuleInfo(
+                prefix=prefix,
+                name=fpath.name.replace(".py", ""),
+                filepath=fpath,
+                import_name=import_name
+            ))
+        
+        found_modules.sort(key=lambda m: m.prefix)
+        return found_modules
+
+    def _import_module_safe(self, module_info: ModuleInfo) -> Any:
+        """Імпортує модуль з обробкою помилок."""
+        if self.error_handler:
+            # Використовуємо обробник помилок
+            def import_func():
+                mod = importlib.import_module(module_info.import_name)
+                module_info.module_object = mod
+                return mod
+            
+            result = self.error_handler.safe_import(import_func, module_info.name)
+            return result
+        else:
+            # Стара логіка (резервна)
+            try:
+                mod = importlib.import_module(module_info.import_name)
+                module_info.module_object = mod
+                return mod
+            except ImportError as e:
+                INTERNAL_LOGGER.warning(f"Модуль {module_info.name} не може бути імпортований: {e}")
+                return None
+            except Exception as e:
+                INTERNAL_LOGGER.error(f"Помилка імпорту {module_info.name}: {e}")
+                return None
+
+    def _call_func(self, module: Any, func_name: str, **kwargs) -> Any:
+        """Безпечний виклик функції модуля."""
+        if module is None:
+            return None
+            
+        if hasattr(module, func_name) and callable(getattr(module, func_name)):
+            func = getattr(module, func_name)
+            
+            if self.error_handler:
+                return self.error_handler.safe_call(func, module.__name__, func_name, **kwargs)
+            else:
+                try:
+                    sig = inspect.signature(func)
+                    if 'app_context' in sig.parameters:
+                        return func(self.app_context)
+                    return func()
+                except Exception as e:
+                    INTERNAL_LOGGER.error(f"Помилка у {func_name}: {e}")
+                    return None
+        return None
+
+    def _merge_configs(self, base: dict, update: dict) -> None:
+        """Рекурсивне оновлення словника конфігурації."""
+        for k, v in update.items():
+            if isinstance(v, dict) and k in base and isinstance(base[k], dict):
+                self._merge_configs(base[k], v)
+            else:
+                base[k] = v
+
+    def _load_all_configs(self) -> None:
+        """Збирає конфігурацію: DEFAULT_CONFIG < config.yaml < config/*.yaml"""
+        final_config = {}
+
+        # 1. Збір DEFAULT_CONFIG з модулів
+        for m in self.modules:
+            mod = self._import_module_safe(m)
+            defaults = getattr(mod, 'DEFAULT_CONFIG', None)
+            if defaults and isinstance(defaults, dict):
+                self._merge_configs(final_config, defaults)
+
+        # 2. Завантаження головного config.yaml
+        if self.config_filepath.exists():
+            try:
+                with open(self.config_filepath, 'r', encoding='utf-8') as f:
+                    main_conf = yaml.safe_load(f) or {}
+                self._merge_configs(final_config, main_conf)
+            except Exception as e:
+                INTERNAL_LOGGER.error(f"Помилка читання config.yaml: {e}")
+
+        # 3. Завантаження додаткових файлів з папки config/
+        if self.config_dir.exists():
+            for cfg_file in self.config_dir.glob("*.yaml"):
+                try:
+                    with open(cfg_file, 'r', encoding='utf-8') as f:
+                        sub_conf = yaml.safe_load(f) or {}
+                    # Припускаємо, що файл названо як секцію (наприклад, logging.yaml -> logging: ...)
+                    # Або просто мерджимо структуру
+                    self._merge_configs(final_config, sub_conf)
+                    INTERNAL_LOGGER.info(f"Довантажено конфіг: {cfg_file.name}")
+                except Exception as e:
+                    INTERNAL_LOGGER.warning(f"Не вдалося завантажити {cfg_file.name}: {e}")
+
+        self.app_context['raw_config'] = final_config
+
+    def run(self) -> Dict[str, Any]:
+        """Головний цикл запуску."""
+        logging.basicConfig(level=logging.INFO, format='[Loader] %(message)s')
+        INTERNAL_LOGGER.info("--- ПОЧАТОК ЗАВАНТАЖЕННЯ ---")
+
+        try:
+            # 1. Сканування
+            self.modules = self._scan_modules()
+            INTERNAL_LOGGER.info(f"Знайдено модулів: {len(self.modules)}")
+
+            # Ініціалізуємо обробник помилок та перевірку залежностей
+            self.error_handler = ErrorHandler(self.app_context) if 'ErrorHandler' in globals() else None
+            self.deps_checker = DependencyChecker(self.app_context) if 'DependencyChecker' in globals() else None
+
+            # 2. Імпорт та збір метаданих (Config Models)
+            for m in self.modules:
+                mod = self._import_module_safe(m)
+                
+                # Збираємо моделі Pydantic
+                models = self._call_func(mod, "prepare_config_models")
+                if models and isinstance(models, dict):
+                    self.app_context['config_models'].update(models)
+
+            # 3. Формування сирого конфігу (Merger)
+            self._load_all_configs()
+
+            # 4. Валідація конфігурації (p_001_config)
+            config_module = next((m for m in self.modules if m.prefix == 1), None)
+            if not config_module:
+                raise RuntimeError("Критично: p_001_config відсутній!")
+            
+            # Запускаємо валідатор
+            validated_conf = self._call_func(config_module.module_object, "initialize")
+            if not validated_conf:
+                raise RuntimeError("Конфігурація не пройшла валідацію.")
+            self.app_context['config'] = validated_conf
+
+            # 5. Ініціалізація інших модулів
+            modules_to_init = [m for m in self.modules if m.prefix != 1]
+            
+            for m in modules_to_init:
+                INTERNAL_LOGGER.info(f"Start: {m.name}")
+                
+                # A. Перевірка залежностей
+                deps_ok = self._call_func(m.module_object, "check_dependencies")
+                if deps_ok is not None:
+                    # Якщо функція повернула словник з all_available=False
+                    if isinstance(deps_ok, dict) and not deps_ok.get("all_available", True):
+                        INTERNAL_LOGGER.warning(f"SKIP {m.name}: Немає залежностей {deps_ok.get('missing_packages')}")
+                        continue
+                    # Якщо функція повернула просто False
+                    if deps_ok is False:
+                         INTERNAL_LOGGER.warning(f"SKIP {m.name}: check_dependencies failed")
+                         continue
+
+                # B. Ініціалізація
+                result = self._call_func(m.module_object, "initialize")
+                
+                # Зберігаємо в initialized для коректного stop()
+                self.initialized_modules.append(m)
+                
+                # Додаємо результат в контекст
+                if result is not None:
+                    # Ключ = ім'я файлу без префікса (p_100_logger -> logger)
+                    # Або просто використовуємо те, що модуль сам поклав в контекст (багато модулів так роблять)
+                    pass 
+
+            INTERNAL_LOGGER.info("--- СИСТЕМА ЗАПУЩЕНА ---")
+            return self.app_context
+
+        except Exception as e:
+            INTERNAL_LOGGER.critical("АВАРІЙНА ЗУПИНКА ЗАВАНТАЖЕННЯ")
+            import traceback
+            traceback.print_exc()
+            self.stop() # Спробувати зупинити те, що встигло запуститись
+            sys.exit(1)
+
+    def stop(self) -> None:
+        """Зупиняє модулі у зворотному порядку."""
+        INTERNAL_LOGGER.info("--- ЗАВЕРШЕННЯ РОБОТИ ---")
+        # Розвертаємо список запущених модулів
+        for m in reversed(self.initialized_modules):
+            try:
+                if m.module_object:
+                    INTERNAL_LOGGER.info(f"Stopping: {m.name}")
+                    self._call_func(m.module_object, "stop")
+            except Exception as e:
+                INTERNAL_LOGGER.error(f"Помилка при зупинці {m.name}: {e}")

@@ -1,0 +1,12 @@
+# Конфігурація модуля: p_303_tts_models
+# Автоматично згенеровано з p_303_tts_models.py
+# Змінюйте цей файл для налаштувань
+---
+
+tts_models:
+  device: auto
+  enabled: true
+  multi_model_path: patriotyk/styletts2_ukrainian_multispeaker
+  prompts_dir: voices
+  single_model_path: patriotyk/styletts2_ukrainian_single
+  single_style_path: filatov.pt

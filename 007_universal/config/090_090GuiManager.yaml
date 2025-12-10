@@ -1,0 +1,13 @@
+# Конфігурація модуля: p_090_gui_manager
+# Автоматично згенеровано з p_090_gui_manager.py
+# Змінюйте цей файл для налаштувань
+---
+
+gui_manager:
+  autostart: true
+  available_guis:
+  - gradio
+  default_gui: gradio
+  enabled: true
+  port_range_end: 7890
+  port_range_start: 7860

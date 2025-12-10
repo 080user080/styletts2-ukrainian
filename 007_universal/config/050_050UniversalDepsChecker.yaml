@@ -1,0 +1,26 @@
+# Конфігурація модуля: p_050_universal_deps_checker
+# Автоматично згенеровано з p_050_universal_deps_checker.py
+# Змінюйте цей файл для налаштувань
+---
+
+universal_deps_checker:
+  auto_install: false
+  check_on_start: true
+  enabled: true
+  log_level: INFO
+  required_packages: {}
+  skip_packages:
+  - typing
+  - collections
+  - dataclasses
+  - pathlib
+  - os
+  - sys
+  - logging
+  - json
+  - yaml
+  - time
+  - datetime
+  - re
+  - math
+  - random
