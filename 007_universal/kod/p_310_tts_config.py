@@ -2,6 +2,11 @@
 """
 Конфігурація TTS модуля.
 Визначає всі моделі Pydantic для налаштування TTS системи.
+
+🔄 ОНОВЛЕНО:
+  - Додана SFXSoundConfig
+  - Розширена документація
+  - Інтеграція з dialog_parser
 """
 
 from pydantic import BaseModel, Field
@@ -45,14 +50,14 @@ class TTSConfig(BaseModel):
     target_dbfs: int = -16
 
 class SFXSoundConfig(BaseModel):
-    """Конфігурація одного звукового ефекту."""
+    """🆕 Конфігурація одного звукового ефекту."""
     file: str
     gain_db: float = 0.0
     normalize: bool = True
     enabled: bool = True
 
 class SFXConfig(BaseModel):
-    """Конфігурація звукових ефектів."""
+    """🔄 ОНОВЛЕНО: Конфігурація звукових ефектів."""
     normalize_dbfs: int = -16
     default_sr: int = 24000
     default_speed: float = 0.88
@@ -69,14 +74,21 @@ class GradioUIConfig(BaseModel):
     show_error: bool = True
     analytics_enabled: bool = False
 
-# Додаткові моделі для повної конфігурації
 class ProcessingConfig(BaseModel):
-    """Конфігурація обробки тексту."""
-    preserve_plus_symbols: bool = True
+    """🔄 ОНОВЛЕНО: Конфігурація обробки тексту (для dialog_parser)."""
+    preserve_plus_symbols: bool = True  # Зберегати '+' для наголосу
     normalize_unicode: bool = True
     split_by_sentences: bool = True
     max_sentence_length: int = 200
     remove_control_chars: bool = True
+
+class DialogParserConfig(BaseModel):
+    """🆕 Конфігурація Dialog Parser."""
+    enabled: bool = True
+    max_tokens: int = Field(280, ge=100, le=512)
+    char_cap: int = Field(1200, ge=500, le=5000)
+    plbert_safe: int = Field(480, ge=100, le=512)
+    speaker_max: int = Field(30, ge=1, le=30)
 
 def prepare_config_models() -> Dict[str, Any]:
     """
@@ -87,7 +99,8 @@ def prepare_config_models() -> Dict[str, Any]:
         'tts': TTSConfig,
         'sfx': SFXConfig,
         'gradio_ui': GradioUIConfig,
-        'processing': ProcessingConfig
+        'processing': ProcessingConfig,
+        'dialog_parser': DialogParserConfig,  # 🆕
     }
 
 # Дефолтні значення для швидкого старту
@@ -130,6 +143,13 @@ DEFAULT_CONFIG = {
         'split_by_sentences': True,
         'max_sentence_length': 200,
         'remove_control_chars': True
+    },
+    'dialog_parser': {  # 🆕
+        'enabled': True,
+        'max_tokens': 280,
+        'char_cap': 1200,
+        'plbert_safe': 480,
+        'speaker_max': 30
     }
 }
 
@@ -139,10 +159,8 @@ def check_dependencies() -> Dict[str, Any]:
     АЛЕ: цей модуль конфігурації не вимагає цих залежностей для роботи.
     Він тільки визначає моделі Pydantic.
     """
-    # Цей модуль (конфігурація) може працювати без зовнішніх бібліотек
-    # Залежності потрібні тільки для TTS двигуна (p_312_tts_engine)
     return {
-        'all_available': True,  # Завжди True, бо це тільки конфігурація
+        'all_available': True,
         'missing_packages': [],
         'installed_packages': [],
         'details': {

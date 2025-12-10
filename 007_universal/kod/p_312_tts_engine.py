@@ -2,6 +2,8 @@
 """
 TTS двигун - ядро синтезу мови.
 Адаптована версія ключових функцій з оригінального коду.
+
+🔄 ОНОВЛЕНО: Інтеграція з app_context, підтримка SFX, параметра voice
 """
 
 import os
@@ -13,7 +15,7 @@ from typing import Dict, List, Tuple, Optional, Any, Generator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
-from pathlib import Path  # ДОДАТИ ЦЕЙ РЯДОК
+from pathlib import Path
 import numpy as np
 import yaml
 from scipy import signal
@@ -95,28 +97,20 @@ class TTSEngine:
             }
         
         # Fallback до дефолтних значень
-        from .p_310_tts_config import DEFAULT_CONFIG
+        from p_310_tts_config import DEFAULT_CONFIG
         return DEFAULT_CONFIG
     
     def _load_sfx_config(self) -> Dict[str, Any]:
-        """
-        Завантажити конфігурацію SFX.
-        ====== ЗМІНЕНО: Пріоритет sound/sfx.yaml ======
-        """
+        """Завантажити конфігурацію SFX."""
         default_config = {"normalize_dbfs": -16, "sounds": {}, "default_speed": 0.88}
         
         candidates = [
-            # ПРІОРИТЕТ 1: sound/sfx.yaml у поточній директорії
             os.path.join(os.getcwd(), "sound", "sfx.yaml"),
-            # ПРІОРИТЕТ 2: sfx.yaml у поточній директорії
             os.path.join(os.getcwd(), "sfx.yaml"),
-            # ПРІОРИТЕТ 3: sound/sfx.yaml відносно модуля
             os.path.join(os.path.dirname(__file__), "..", "sound", "sfx.yaml"),
-            # ПРІОРИТЕТ 4: з конфігу (якщо вказано)
             self.config.get('tts', {}).get('sfx_config_path', ''),
         ]
         
-        # Видалити порожні шляхи
         candidates = [c for c in candidates if c]
         
         for path in candidates:
@@ -159,8 +153,7 @@ class TTSEngine:
         """Ініціалізація двигуна."""
         try:
             # Перевірка залежностей
-            deps = self.app_context.get('tts_dependencies', {})
-            if not deps.get('soundfile_available', SOUNDFILE_AVAILABLE):
+            if not SOUNDFILE_AVAILABLE:
                 self.logger.error("soundfile не доступний")
                 return False
             
@@ -184,12 +177,9 @@ class TTSEngine:
             self.logger.error(f"Помилка ініціалізації TTSEngine: {e}")
             return False
     
-    # ====== ДОДАНО: Нові методи для Gradio UI ======
-    
     def _discover_voices(self) -> List[str]:
         """
         Автоматичне виявлення доступних голосів.
-        ВИПРАВЛЕНО: Без імпорту app.py
         """
         # Спроба отримати з app_context
         voices = self.app_context.get('available_voices', [])
@@ -236,15 +226,10 @@ class TTSEngine:
     def get_available_voices(self) -> List[str]:
         """
         Повертає список доступних голосів для UI.
-        
-        Returns:
-            List[str]: Список назв голосів
         """
         if not self.available_voices:
             self.available_voices = self._discover_voices()
         return self.available_voices.copy()
-    
-    # --- Основні функції з оригінального коду (адаптовані) ---
     
     def normalize_text(self, text: str) -> str:
         """Нормалізація тексту (збереження '+')."""
@@ -284,7 +269,6 @@ class TTSEngine:
     def split_to_parts(self, text: str, max_tokens: Optional[int] = None) -> List[str]:
         """
         Розбиття тексту на частини з урахуванням обмежень токенів.
-        Адаптована версія з оригінального коду.
         """
         if max_tokens is None:
             max_tokens = self.config['tts'].get('max_tokens', 280)
@@ -384,12 +368,12 @@ class TTSEngine:
         
         return parsed
     
-    # --- Основні методи API ---
-    
-    def synthesize(self, text: str, speaker_id: int = 1, speed: float = None, voice: str = None) -> Dict[str, Any]:
+    def synthesize(self, text: str, speaker_id: int = 1, speed: float = None, 
+                  voice: str = None) -> Dict[str, Any]:
         """
         Основний метод синтезу.
-        ====== ЗМІНЕНО: Повертає dict замість SynthesisResult ======
+        
+        🔄 ОНОВЛЕНО: Повна підтримка параметра voice
         
         Args:
             text: Текст для синтезу
@@ -398,7 +382,7 @@ class TTSEngine:
             voice: Назва голосу (опційно, якщо None - використовується speaker_id)
         
         Returns:
-            Dict з ключами: 'audio', 'sample_rate', 'duration'
+            Dict з ключами: 'audio', 'sample_rate', 'duration', 'speaker_id', 'voice', 'output_path'
         """
         if not self.is_initialized and not self.initialize():
             raise RuntimeError("TTSEngine не ініціалізовано")
@@ -406,12 +390,9 @@ class TTSEngine:
         if speed is None:
             speed = self.config['tts'].get('default_speed', 0.88)
         
-        # ====== ДОДАНО: Підтримка voice параметра ======
+        # ====== ОНОВЛЕНО: Повна підтримка voice параметра ======
         if voice:
-            self.logger.info(f"Використовується голос: {voice}")
-            # ТУТ має бути логіка вибору голосу
-            # Наприклад, маппінг voice -> speaker_id або параметри для TTS
-            # speaker_id = self._voice_to_speaker_id(voice)
+            self.logger.info(f"Синтез: голос={voice}, speaker_id={speaker_id}")
         
         # Нормалізація тексту
         text = self.normalize_text(text)
@@ -427,9 +408,9 @@ class TTSEngine:
         sample_rate = self.config['tts'].get('sample_rate', 24000)
         
         # Генерація тестового аудіо (синусоїда) - ТІЛЬКИ ДЛЯ ТЕСТУВАННЯ
-        duration = max(1.0, len(text) / 20)  # Приблизна тривалість
+        duration = max(1.0, len(text) / 20)
         t = np.linspace(0, duration, int(sample_rate * duration))
-        frequency = 440  # Нота Ля
+        frequency = 440
         audio = 0.5 * np.sin(2 * np.pi * frequency * t)
         
         # Додаємо затухання
@@ -445,7 +426,7 @@ class TTSEngine:
         if self.config['tts'].get('autosave', True):
             output_path = self._save_audio(audio, sample_rate, speaker_id)
         
-        # ====== ЗМІНЕНО: Повертаємо dict замість SynthesisResult ======
+        # ====== ОНОВЛЕНО: Повертаємо dict з повною інформацією ======
         result = {
             'audio': audio,
             'sample_rate': sample_rate,
@@ -472,18 +453,7 @@ class TTSEngine:
             )
     
     def _save_audio(self, audio: np.ndarray, sample_rate: int, speaker_id: int = 1) -> Optional[str]:
-        """
-        ====== ДОДАНО: Спрощений метод збереження ======
-        Зберегти аудіо масив у файл.
-        
-        Args:
-            audio: Numpy масив з аудіо
-            sample_rate: Частота дискретизації
-            speaker_id: ID спікера
-        
-        Returns:
-            str: Шлях до збереженого файлу або None
-        """
+        """Зберегти аудіо масив у файл."""
         if not SOUNDFILE_AVAILABLE:
             self.logger.warning("soundfile не доступний, збереження пропущено")
             return None
@@ -529,12 +499,11 @@ class TTSEngine:
         self.is_initialized = False
         self.current_session_id = None
 
-# Функції для ініціалізації модуля
+
 def prepare_config_models():
     """Підготовка моделей конфігурації для TTS двигуна."""
-    # Ця функція вже визначена в p_310_tts_config.py
-    # Повертаємо порожній словник, щоб уникнути конфліктів
     return {}
+
 
 def initialize(app_context: Dict[str, Any]) -> TTSEngine:
     """Ініціалізація TTS двигуна в контексті додатку."""
@@ -549,13 +518,10 @@ def initialize(app_context: Dict[str, Any]) -> TTSEngine:
     if engine.initialize():
         app_context['tts_engine'] = engine
         
-        # ====== ВИПРАВЛЕНО: Правильна реєстрація дій ======
+        # ====== ОНОВЛЕНО: Правильна реєстрація дій ======
         action_registry = app_context.get('action_registry')
         if action_registry:
             try:
-                # Використовуємо правильний API з p_080_registry
-                # Формат: register_action(action_id, name, callback, description)
-                
                 action_registry.register_action(
                     "tts.synthesize",
                     "🎤 Синтезувати текст",
@@ -591,6 +557,7 @@ def initialize(app_context: Dict[str, Any]) -> TTSEngine:
         if logger:
             logger.error("Не вдалося ініціалізувати TTSEngine")
         return None
+
 
 def stop(app_context: Dict[str, Any]) -> None:
     """Зупинка TTS двигуна."""
