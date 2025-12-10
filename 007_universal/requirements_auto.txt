@@ -1,5 +1,5 @@
 # Автоматично згенеровано UniversalDepsChecker
-# Загалом пакетів: 24
+# Загалом пакетів: 25
 
 ast
 colorama>=0.4.6
@@ -23,5 +23,6 @@ threading
 torch>=2.9.0
 traceback
 transformers>=4.52.3
+types
 ukrainian_word_stress>=1.1.1
 unicodedata

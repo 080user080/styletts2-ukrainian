@@ -1,191 +1,199 @@
-# p_312_tts_engine.py (оновлений метод synthesize)
+# p_312_tts_engine.py - TTSEngine з конвертацією config в dict
 
-def synthesize(self, text: str, speaker_id: int = 1, speed: float = None, 
-               voice: str = None) -> Dict[str, Any]:
-    """
-    Основний метод синтезу з використанням справжніх TTS моделей.
-    
-    Args:
-        text: Текст для синтезу
-        speaker_id: ID спікера (1-30)
-        speed: Швидкість синтезу (0.7-1.3)
-        voice: Назва голосу (для multi моделі)
-        
-    Returns:
-        Dict з результатами синтезу
-    """
-    if not self.is_initialized and not self.initialize():
-        raise RuntimeError("TTSEngine не ініціалізовано")
-    
-    if speed is None:
-        speed = self.config['tts'].get('default_speed', 0.88)
-    
-    logger = self.app_context.get('logger', logging.getLogger("TTSEngine"))
-    logger.info(f"Синтез: {len(text)} символів, спікер: {speaker_id}, швидкість: {speed}, голос: {voice}")
-    
-    try:
-        # 1. Отримати менеджер моделей TTS
-        tts_models = self.app_context.get('tts_models')
-        if not tts_models:
-            logger.error("TTS моделі не знайдені в контексті")
-            return self._generate_test_audio(text, speed)
-        
-        # 2. Отримати verbalizer (якщо доступний)
-        verbalizer = self.app_context.get('verbalizer')
-        
-        # 3. Обробити текст (вербалізація, якщо потрібно)
-        processed_text = text
-        if verbalizer and any(c.isdigit() for c in text):
+from typing import Dict, Any
+from types import SimpleNamespace
+import logging
+import numpy as np
+import torch
+
+class TTSEngine:
+    def __init__(self, app_context: Dict[str, Any]):
+        self.app_context = app_context
+        self.config = app_context.get('config', {})
+        # Якщо config — pydantic або інший об'єкт, спробуємо перетворити в dict
+        if not isinstance(self.config, dict):
             try:
-                processed_text = verbalizer.generate_text(text)
-                logger.debug(f"Текст вербалізовано: {processed_text[:100]}...")
-            except Exception as e:
-                logger.warning(f"Помилка вербалізації: {e}")
-        
-        # 4. Нормалізація тексту
-        processed_text = self.normalize_text(processed_text)
-        
-        # 5. Розбиття на частини (якщо потрібно)
-        parts = self.split_to_parts(processed_text)
-        
-        # 6. Синтез кожної частини
-        all_audio = []
-        sample_rate = self.config['tts'].get('sample_rate', 24000)
-        
-        for i, part_text in enumerate(parts):
-            logger.debug(f"Синтез частини {i+1}/{len(parts)}: {len(part_text)} символів")
-            
-            try:
-                # Отримати модель та стиль
-                if voice:
-                    # Використовувати multi модель з вибраним голосом
-                    model, style = tts_models.get_multi_model(voice)
-                    if not style:
-                        raise RuntimeError(f"Стиль для голосу '{voice}' не знайдено")
-                else:
-                    # Використовувати single модель
-                    model, style = tts_models.get_single_model()
-                    if not style:
-                        raise RuntimeError("Single стиль не завантажено")
-                
-                # Підготувати текст для синтезу
-                # Тут потрібна обробка тексту (IPA, наголоси тощо)
-                # Для початку - проста реалізація
-                
-                # Виклик моделі для синтезу (замість заглушки)
-                # Це спрощена версія, потрібно адаптувати з оригінального коду
-                
-                # Імпортуємо необхідні модулі для обробки тексту
-                try:
-                    from ipa_uk import ipa
-                    from ukrainian_word_stress import Stressifier, StressSymbol
-                    import re
-                    from unicodedata import normalize
-                    
-                    # Обробка тексту (як у p_305_tts_gradio_main.py)
-                    stressify = Stressifier()
-                    t = part_text.replace('+', StressSymbol.CombiningAcuteAccent)
-                    t = normalize('NFKC', t)
-                    t = re.sub(r'[᠆‐‑‒–—―⁻₋−⸺⸻]', '-', t)
-                    t = re.sub(r' - ', ': ', t)
-                    
-                    # Конвертація в IPA
-                    ps = ipa(stressify(t))
-                    
-                    if not ps:
-                        logger.warning(f"Не вдалося конвертувати в IPA: {part_text[:50]}...")
-                        continue
-                    
-                    # Токенізація та синтез
-                    tokens = model.tokenizer.encode(ps)
-                    wav = model(tokens, speed=speed, s_prev=style)
-                    
-                    # Перетворення в numpy array
-                    if hasattr(wav, 'cpu'):
-                        wav = wav.cpu()
-                    
-                    audio_part = wav.numpy() if isinstance(wav, torch.Tensor) else np.array(wav)
-                    all_audio.append(audio_part)
-                    
-                except ImportError as e:
-                    logger.error(f"Відсутні залежності для синтезу: {e}")
-                    return self._generate_test_audio(text, speed)
-                except Exception as e:
-                    logger.error(f"Помилка синтезу частини: {e}")
-                    continue
-                
-            except Exception as e:
-                logger.error(f"Помилка обробки частини {i+1}: {e}")
-                continue
-        
-        # 7. Об'єднати всі частини
-        if not all_audio:
-            raise RuntimeError("Не вдалося синтезувати жодну частину")
-        
-        concatenated = np.concatenate(all_audio)
-        duration = len(concatenated) / sample_rate
-        
-        # 8. Зберегти результат (якщо налаштовано)
-        output_path = None
-        if self.config['tts'].get('autosave', True):
-            output_path = self._save_audio(concatenated, sample_rate, speaker_id)
-        
-        # 9. Повернути результат
+                self.config = self.config.dict()
+            except Exception:
+                # якщо не вийшло — залишаємо як є (будемо звертатись обережно)
+                pass
+        self.is_initialized = False
+        self.logger = app_context.get('logger', logging.getLogger("TTSEngine"))
+
+    def initialize(self) -> bool:
+        try:
+            self.is_initialized = True
+            self.app_context['tts_engine'] = self
+            self.logger.info("Ініціалізація TTSEngine завершена")
+            return True
+        except Exception as e:
+            self.logger.error(f"Не вдалося ініціалізувати TTSEngine: {e}")
+            return False
+
+    def get_status(self) -> Dict[str, Any]:
         return {
-            'audio': concatenated,
+            'initialized': self.is_initialized,
+            'models_loaded': bool(self.app_context.get('tts_models')),
+            'verbalizer': bool(self.app_context.get('verbalizer'))
+        }
+
+    def synthesize(self, text: str, speaker_id: int = 1, speed: float = None,
+                   voice: str = None) -> SimpleNamespace:
+        if not self.is_initialized and not self.initialize():
+            raise RuntimeError("TTSEngine не ініціалізовано")
+
+        # Безпечне отримання значень з config (тут config — dict або об'єкт)
+        def cfg_get(key, default=None):
+            try:
+                if isinstance(self.config, dict):
+                    return self.config.get(key, default)
+                # якщо config — об'єкт (pydantic), спробуємо атрибут
+                return getattr(self.config, key, default)
+            except Exception:
+                return default
+
+        if speed is None:
+            speed = cfg_get('tts', {}).get('default_speed', 0.88) if isinstance(cfg_get('tts', {}), dict) else getattr(cfg_get('tts', {}), 'default_speed', 0.88)
+
+        logger = self.app_context.get('logger', logging.getLogger("TTSEngine"))
+        logger.info(f"Синтез: {len(text)} символів, спікер: {speaker_id}, швидкість: {speed}, голос: {voice}")
+
+        try:
+            tts_models = self.app_context.get('tts_models')
+            if not tts_models:
+                logger.error("TTS моделі не знайдені в контексті — повертаю тестове аудіо")
+                return self._generate_test_audio(text, speed)
+
+            verbalizer = self.app_context.get('verbalizer')
+
+            processed_text = text
+            if verbalizer and any(c.isdigit() for c in text):
+                try:
+                    processed_text = verbalizer.generate_text(text)
+                except Exception as e:
+                    logger.warning(f"Помилка вербалізації: {e}")
+
+            if hasattr(self, 'normalize_text'):
+                processed_text = self.normalize_text(processed_text)
+            parts = self.split_to_parts(processed_text) if hasattr(self, 'split_to_parts') else [processed_text]
+
+            all_audio = []
+            sample_rate = cfg_get('tts', {}).get('sample_rate', 24000) if isinstance(cfg_get('tts', {}), dict) else getattr(cfg_get('tts', {}), 'sample_rate', 24000)
+
+            for i, part_text in enumerate(parts):
+                logger.debug(f"Синтез частини {i+1}/{len(parts)}: {len(part_text)} символів")
+                try:
+                    if voice and hasattr(tts_models, 'get_multi_model'):
+                        model, style = tts_models.get_multi_model(voice)
+                    elif hasattr(tts_models, 'get_single_model'):
+                        model, style = tts_models.get_single_model()
+                    else:
+                        logger.error("Менеджер моделей не має очікуваних методів")
+                        return self._generate_test_audio(text, speed)
+
+                    try:
+                        from ipa_uk import ipa
+                        from ukrainian_word_stress import Stressifier, StressSymbol
+                        import re
+                        from unicodedata import normalize
+
+                        stressify = Stressifier()
+                        t = part_text.replace('+', StressSymbol.CombiningAcuteAccent)
+                        t = normalize('NFKC', t)
+                        t = re.sub(r'[᠆‐‑‒–—―⁻₋−⸺⸻]', '-', t)
+                        t = re.sub(r' - ', ': ', t)
+
+                        ps = ipa(stressify(t))
+                        if not ps:
+                            logger.warning("Не вдалося згенерувати IPA для частини")
+                            continue
+
+                        tokens = model.tokenizer.encode(ps)
+                        wav = model(tokens, speed=speed, s_prev=style)
+
+                        if hasattr(wav, 'cpu'):
+                            wav = wav.cpu()
+                        audio_part = wav.numpy() if isinstance(wav, torch.Tensor) else np.array(wav)
+                        all_audio.append(audio_part)
+
+                    except ImportError as e:
+                        logger.error(f"Відсутні залежності для синтезу: {e}")
+                        return self._generate_test_audio(text, speed)
+                    except Exception as e:
+                        logger.error(f"Помилка під час синтезу частини: {e}")
+                        continue
+
+                except Exception as e:
+                    logger.error(f"Помилка обробки частини {i+1}: {e}")
+                    continue
+
+            if not all_audio:
+                raise RuntimeError("Не вдалося синтезувати жодну частину")
+
+            concatenated = np.concatenate(all_audio)
+            duration = len(concatenated) / sample_rate
+
+            output_path = None
+            tts_cfg = cfg_get('tts', {})
+            autosave = (tts_cfg.get('autosave', True) if isinstance(tts_cfg, dict) else getattr(tts_cfg, 'autosave', True))
+            if autosave and hasattr(self, '_save_audio'):
+                output_path = self._save_audio(concatenated, sample_rate, speaker_id)
+
+            result_dict = {
+                'audio': concatenated,
+                'sample_rate': sample_rate,
+                'duration': duration,
+                'speaker_id': speaker_id,
+                'speed': speed,
+                'voice': voice,
+                'output_path': output_path,
+                'text': text,
+                'processed_text': processed_text,
+                'is_test': False
+            }
+            return result_dict
+
+        except Exception as e:
+            logger.error(f"Критична помилка синтезу: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._generate_test_audio(text, speed)
+
+    def _generate_test_audio(self, text: str, speed: float) -> SimpleNamespace:
+        sample_rate = 24000
+        try:
+            tts_cfg = self.config if isinstance(self.config, dict) else (self.config if hasattr(self.config, 'tts') else {})
+            sample_rate = tts_cfg.get('sample_rate', 24000) if isinstance(tts_cfg, dict) else getattr(tts_cfg, 'sample_rate', 24000)
+        except Exception:
+            sample_rate = 24000
+
+        duration = max(0.5, min(len(text) / 50, 10.0))
+        base_freq = 220 + (hash(text) % 880)
+        t = np.linspace(0, duration, int(sample_rate * duration))
+        audio = 0.3 * np.sin(2 * np.pi * base_freq * t)
+        audio += 0.1 * np.sin(2 * np.pi * base_freq * 1.5 * t)
+        audio += 0.05 * np.sin(2 * np.pi * base_freq * 2 * t)
+        fade_samples = int(0.05 * sample_rate)
+        if len(audio) > fade_samples:
+            fade_in = np.linspace(0, 1, fade_samples)
+            fade_out = np.linspace(1, 0, fade_samples)
+            audio[:fade_samples] *= fade_in
+            audio[-fade_samples:] *= fade_out
+        audio = audio / np.max(np.abs(audio)) * 0.5
+        result = {
+            'audio': audio,
             'sample_rate': sample_rate,
             'duration': duration,
-            'speaker_id': speaker_id,
+            'speaker_id': 1,
             'speed': speed,
-            'voice': voice,
-            'output_path': output_path,
-            'text': text,
-            'processed_text': processed_text
+            'voice': 'test',
+            'output_path': None,
+            'is_test': True
         }
-        
-    except Exception as e:
-        logger.error(f"Критична помилка синтезу: {e}")
-        import traceback
-        traceback.print_exc()
-        # Fallback до тестового аудіо
-        return self._generate_test_audio(text, speed)
+        return result
 
-def _generate_test_audio(self, text: str, speed: float) -> Dict[str, Any]:
-    """
-    Генерує тестове аудіо (синусоїду) для відлагодження.
-    Використовується лише як fallback.
-    """
-    sample_rate = self.config['tts'].get('sample_rate', 24000)
-    duration = max(0.5, min(len(text) / 50, 10.0))  # Обмежити тривалість
-    
-    # Різні частоти для різних спікерів
-    base_freq = 220 + (hash(text) % 880)
-    
-    t = np.linspace(0, duration, int(sample_rate * duration))
-    
-    # Більш складна хвиля для більш природнього звуку
-    audio = 0.3 * np.sin(2 * np.pi * base_freq * t)
-    audio += 0.1 * np.sin(2 * np.pi * base_freq * 1.5 * t)
-    audio += 0.05 * np.sin(2 * np.pi * base_freq * 2 * t)
-    
-    # Затухання
-    fade_samples = int(0.05 * sample_rate)
-    if len(audio) > fade_samples:
-        fade_in = np.linspace(0, 1, fade_samples)
-        fade_out = np.linspace(1, 0, fade_samples)
-        audio[:fade_samples] *= fade_in
-        audio[-fade_samples:] *= fade_out
-    
-    # Нормалізація
-    audio = audio / np.max(np.abs(audio)) * 0.5
-    
-    return {
-        'audio': audio,
-        'sample_rate': sample_rate,
-        'duration': duration,
-        'speaker_id': 1,
-        'speed': speed,
-        'voice': 'test',
-        'output_path': None,
-        'is_test': True
-    }
+# Сумісність з loader
+def initialize(app_context: Dict[str, Any]) -> Dict[str, Any]:
+    engine = TTSEngine(app_context)
+    ok = engine.initialize()
+    return {"status": "ok" if ok else "error", "engine": engine}
