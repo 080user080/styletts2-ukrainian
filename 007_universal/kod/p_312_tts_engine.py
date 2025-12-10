@@ -1,570 +1,191 @@
-# p_312_tts_engine.py
-"""
-TTS двигун - ядро синтезу мови.
-Адаптована версія ключових функцій з оригінального коду.
+# p_312_tts_engine.py (оновлений метод synthesize)
 
-🔄 ОНОВЛЕНО: Інтеграція з app_context, підтримка SFX, параметра voice
-"""
-
-import os
-import time
-import re
-import unicodedata
-import traceback
-from typing import Dict, List, Tuple, Optional, Any, Generator
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-import logging
-from pathlib import Path
-import numpy as np
-import yaml
-from scipy import signal
-import math
-
-# Типові імпорти для TTS
-try:
-    import soundfile as sf
-    SOUNDFILE_AVAILABLE = True
-except ImportError:
-    SOUNDFILE_AVAILABLE = False
-    print("WARNING: soundfile не встановлено, збереження аудіо недоступне")
-
-# Імпорт для токенізації (опційно)
-try:
-    from transformers import AutoTokenizer
-    TOKENIZER_AVAILABLE = True
-except ImportError:
-    AutoTokenizer = None
-    TOKENIZER_AVAILABLE = False
-
-@dataclass
-class TTSPart:
-    """Представляє частину тексту для синтезу."""
-    text: str
-    speaker_id: int
-    speed: float
-    index: int
-    metadata: Dict[str, Any] = None
-
-@dataclass
-class SynthesisResult:
-    """Результат синтезу."""
-    audio: np.ndarray
-    sample_rate: int
-    duration: float
-    part: TTSPart
-    output_path: Optional[str] = None
-
-class TTSEngine:
+def synthesize(self, text: str, speaker_id: int = 1, speed: float = None, 
+               voice: str = None) -> Dict[str, Any]:
     """
-    Основний двигун TTS синтезу.
-    Інтегрує логіку з оригінального коду в модульну систему.
+    Основний метод синтезу з використанням справжніх TTS моделей.
+    
+    Args:
+        text: Текст для синтезу
+        speaker_id: ID спікера (1-30)
+        speed: Швидкість синтезу (0.7-1.3)
+        voice: Назва голосу (для multi моделі)
+        
+    Returns:
+        Dict з результатами синтезу
     """
+    if not self.is_initialized and not self.initialize():
+        raise RuntimeError("TTSEngine не ініціалізовано")
     
-    def __init__(self, app_context: Dict[str, Any]):
-        self.app_context = app_context
-        self.logger = logging.getLogger("TTSEngine")
-        
-        # Конфігурація
-        self.config = self._get_config()
-        self.sfx_config = self._load_sfx_config()
-        
-        # Кеш токенізатора
-        self._tokenizer = None
-        self._init_tokenizer()
-        
-        # Стан двигуна
-        self.is_initialized = False
-        self.current_session_id = None
-        self.output_dir = None
-        self.speaker_configs = {}
-        
-        # ====== ДОДАНО: Список доступних голосів ======
-        self.available_voices = []
-        
-        self.logger.info("TTSEngine створено")
+    if speed is None:
+        speed = self.config['tts'].get('default_speed', 0.88)
     
-    def _get_config(self) -> Dict[str, Any]:
-        """Отримати конфігурацію TTS з app_context."""
-        config = self.app_context.get('config', {})
-        
-        # Якщо конфіг вже валідований Pydantic
-        if hasattr(config, 'tts'):
-            return {
-                'tts': config.tts.dict(),
-                'sfx': config.sfx.dict() if hasattr(config, 'sfx') else {},
-                'processing': config.processing.dict() if hasattr(config, 'processing') else {}
-            }
-        
-        # Fallback до дефолтних значень
-        from p_310_tts_config import DEFAULT_CONFIG
-        return DEFAULT_CONFIG
+    logger = self.app_context.get('logger', logging.getLogger("TTSEngine"))
+    logger.info(f"Синтез: {len(text)} символів, спікер: {speaker_id}, швидкість: {speed}, голос: {voice}")
     
-    def _load_sfx_config(self) -> Dict[str, Any]:
-        """Завантажити конфігурацію SFX."""
-        default_config = {"normalize_dbfs": -16, "sounds": {}, "default_speed": 0.88}
-        
-        candidates = [
-            os.path.join(os.getcwd(), "sound", "sfx.yaml"),
-            os.path.join(os.getcwd(), "sfx.yaml"),
-            os.path.join(os.path.dirname(__file__), "..", "sound", "sfx.yaml"),
-            self.config.get('tts', {}).get('sfx_config_path', ''),
-        ]
-        
-        candidates = [c for c in candidates if c]
-        
-        for path in candidates:
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        data = yaml.safe_load(f)
-                        if isinstance(data, dict):
-                            data['_cfg_dir'] = os.path.dirname(path)
-                            self.logger.info(f"✅ SFX конфіг завантажено: {path}")
-                            return data
-                except Exception as e:
-                    self.logger.warning(f"Не вдалося завантажити {path}: {e}")
-        
-        self.logger.warning("⚠️ SFX конфіг не знайдено, використовуються дефолтні значення")
-        return default_config
-    
-    def _init_tokenizer(self):
-        """Ініціалізація токенізатора (якщо доступно)."""
-        if not TOKENIZER_AVAILABLE:
-            self._tokenizer = None
-            return
-        
-        try:
-            self._tokenizer = AutoTokenizer.from_pretrained("albert-base-v2")
-            self.logger.debug("Токенізатор ініціалізовано")
-        except Exception as e:
-            self.logger.warning(f"Не вдалося завантажити токенізатор: {e}")
-            self._tokenizer = None
-    
-    def _token_length(self, text: str) -> int:
-        """Оцінити довжину в токенах."""
-        if self._tokenizer:
-            return len(self._tokenizer.encode(text, add_special_tokens=True))
-        
-        # Консервативний fallback
-        return len(text) + 32
-    
-    def initialize(self) -> bool:
-        """Ініціалізація двигуна."""
-        try:
-            # Перевірка залежностей
-            if not SOUNDFILE_AVAILABLE:
-                self.logger.error("soundfile не доступний")
-                return False
-            
-            # Створення вихідної директорії
-            output_dir = self.config['tts'].get('output_dir', 'output_audio')
-            os.makedirs(output_dir, exist_ok=True)
-            self.output_dir = output_dir
-            
-            # Генерація ID сесії
-            self.current_session_id = f"tts_{int(time.time())}"
-            
-            # ====== ДОДАНО: Завантаження списку голосів ======
-            self.available_voices = self._discover_voices()
-            
-            self.is_initialized = True
-            self.logger.info(f"TTSEngine ініціалізовано, сесія: {self.current_session_id}")
-            self.logger.info(f"Доступно голосів: {len(self.available_voices)}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Помилка ініціалізації TTSEngine: {e}")
-            return False
-    
-    def _discover_voices(self) -> List[str]:
-        """
-        Автоматичне виявлення доступних голосів.
-        """
-        # Спроба отримати з app_context
-        voices = self.app_context.get('available_voices', [])
-        if voices:
-            self.logger.info(f"Використано голоси з app_context: {len(voices)}")
-            return voices
-        
-        # Спроба отримати з tts_models (якщо модуль завантажений)
+    try:
+        # 1. Отримати менеджер моделей TTS
         tts_models = self.app_context.get('tts_models')
-        if tts_models and hasattr(tts_models, 'get_available_voices'):
+        if not tts_models:
+            logger.error("TTS моделі не знайдені в контексті")
+            return self._generate_test_audio(text, speed)
+        
+        # 2. Отримати verbalizer (якщо доступний)
+        verbalizer = self.app_context.get('verbalizer')
+        
+        # 3. Обробити текст (вербалізація, якщо потрібно)
+        processed_text = text
+        if verbalizer and any(c.isdigit() for c in text):
             try:
-                model_voices = tts_models.get_available_voices()
-                if model_voices:
-                    self.logger.info(f"✅ Отримано голоси з TTS моделей: {len(model_voices)}")
-                    return model_voices
+                processed_text = verbalizer.generate_text(text)
+                logger.debug(f"Текст вербалізовано: {processed_text[:100]}...")
             except Exception as e:
-                self.logger.debug(f"Не вдалося отримати голоси з TTS моделей: {e}")
+                logger.warning(f"Помилка вербалізації: {e}")
         
-        # Fallback: спроба прочитати з папки voices
-        voices_dir = Path("voices")
-        if voices_dir.exists():
-            try:
-                pt_files = list(voices_dir.glob("*.pt"))
-                pt_files.extend(voices_dir.glob("*.wav"))
-                pt_files.extend(voices_dir.glob("*.mp3"))
-                
-                if pt_files:
-                    voices = [f.stem for f in pt_files]
-                    self.logger.info(f"✅ Знайдено голосів у папці voices: {len(voices)}")
-                    return voices
-            except Exception as e:
-                self.logger.debug(f"Не вдалося прочитати папку voices: {e}")
+        # 4. Нормалізація тексту
+        processed_text = self.normalize_text(processed_text)
         
-        # Fallback: базові голоси для тестування
-        fallback_voices = [
-            "default",
-            "Філатов Дмитро",
-            "Narrator Male",
-            "Narrator Female",
-        ]
-        self.logger.warning(f"⚠️ Використовуються тестові голоси: {fallback_voices}")
-        return fallback_voices
-    
-    def get_available_voices(self) -> List[str]:
-        """
-        Повертає список доступних голосів для UI.
-        """
-        if not self.available_voices:
-            self.available_voices = self._discover_voices()
-        return self.available_voices.copy()
-    
-    def normalize_text(self, text: str) -> str:
-        """Нормалізація тексту (збереження '+')."""
-        if not isinstance(text, str):
-            return str(text) if text else ""
+        # 5. Розбиття на частини (якщо потрібно)
+        parts = self.split_to_parts(processed_text)
         
-        # NFKC нормалізація
-        text = unicodedata.normalize("NFKC", text).replace("\ufeff", "")
-        
-        # Уніфікація апострофів і тире
-        text = (text.replace("'", "'").replace("'", "'").replace("ʼ", "'")
-                   .replace("—", "-").replace("–", "-").replace("−", "-"))
-        
-        # Видалення невидимих символів (збереження \n, \r, \t, +)
-        result = []
-        for char in text:
-            if char == '+':
-                result.append(char)
-                continue
-            
-            category = unicodedata.category(char)
-            if category in ("Cf", "Cc") and char not in ("\n", "\r", "\t"):
-                continue
-            
-            result.append(char)
-        
-        text = "".join(result)
-        
-        # Заміна NBSP на звичайний пробіл
-        text = text.replace("\u00A0", " ")
-        
-        # Очищення пробілів навколо переносів
-        text = re.sub(r"\s*\n\s*", "\n", text)
-        
-        return text.strip()
-    
-    def split_to_parts(self, text: str, max_tokens: Optional[int] = None) -> List[str]:
-        """
-        Розбиття тексту на частини з урахуванням обмежень токенів.
-        """
-        if max_tokens is None:
-            max_tokens = self.config['tts'].get('max_tokens', 280)
-        
-        char_cap = self.config['tts'].get('char_cap', 1200)
-        text = self.normalize_text(text)
-        
-        # Проста реалізація для початку
-        parts = []
-        current_part = ""
-        current_token_count = 0
-        
-        # Розбиття на речення
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        
-        for sentence in sentences:
-            if not sentence.strip():
-                continue
-            
-            sentence_tokens = self._token_length(sentence)
-            
-            # Якщо речення дуже довге, розбиваємо його
-            if sentence_tokens > max_tokens or len(sentence) > char_cap:
-                # Додаємо те, що накопичили
-                if current_part:
-                    parts.append(current_part.strip())
-                    current_part = ""
-                    current_token_count = 0
-                
-                # Розбиваємо довге речення
-                words = sentence.split()
-                chunk = []
-                chunk_tokens = 0
-                
-                for word in words:
-                    word_tokens = self._token_length(word)
-                    
-                    if chunk_tokens + word_tokens > max_tokens:
-                        if chunk:
-                            parts.append(" ".join(chunk).strip())
-                        chunk = [word]
-                        chunk_tokens = word_tokens
-                    else:
-                        chunk.append(word)
-                        chunk_tokens += word_tokens
-                
-                if chunk:
-                    parts.append(" ".join(chunk).strip())
-            
-            # Якщо речення поміщається
-            elif current_token_count + sentence_tokens <= max_tokens:
-                if current_part:
-                    current_part += " " + sentence
-                else:
-                    current_part = sentence
-                current_token_count += sentence_tokens
-            
-            # Якщо не поміщається
-            else:
-                if current_part:
-                    parts.append(current_part.strip())
-                current_part = sentence
-                current_token_count = sentence_tokens
-        
-        # Додаємо останню частину
-        if current_part:
-            parts.append(current_part.strip())
-        
-        return parts
-    
-    def parse_dialog_tags(self, text: str) -> List[Tuple[int, str]]:
-        """Парсинг тегів діалогу (#gN)."""
-        text = self.normalize_text(text)
-        lines = text.splitlines()
-        current_tag = None
-        parsed = []
-        
-        tag_re = re.compile(r'^#g([1-9]|[12][0-9]|30)\s*:\s*(.*)$', re.I)
-        
-        for line in lines:
-            line = line.rstrip()
-            if not line:
-                continue
-            
-            match = tag_re.match(line)
-            if match:
-                current_tag = int(match.group(1))
-                tail = match.group(2).strip()
-                if tail:
-                    for part in self.split_to_parts(tail):
-                        parsed.append((current_tag, part))
-                continue
-            
-            speaker_id = current_tag if current_tag is not None else 1
-            for part in self.split_to_parts(line):
-                parsed.append((speaker_id, part))
-        
-        return parsed
-    
-    def synthesize(self, text: str, speaker_id: int = 1, speed: float = None, 
-                  voice: str = None) -> Dict[str, Any]:
-        """
-        Основний метод синтезу.
-        
-        🔄 ОНОВЛЕНО: Повна підтримка параметра voice
-        
-        Args:
-            text: Текст для синтезу
-            speaker_id: ID спікера (1-30)
-            speed: Швидкість синтезу (0.7-1.3)
-            voice: Назва голосу (опційно, якщо None - використовується speaker_id)
-        
-        Returns:
-            Dict з ключами: 'audio', 'sample_rate', 'duration', 'speaker_id', 'voice', 'output_path'
-        """
-        if not self.is_initialized and not self.initialize():
-            raise RuntimeError("TTSEngine не ініціалізовано")
-        
-        if speed is None:
-            speed = self.config['tts'].get('default_speed', 0.88)
-        
-        # ====== ОНОВЛЕНО: Повна підтримка voice параметра ======
-        if voice:
-            self.logger.info(f"Синтез: голос={voice}, speaker_id={speaker_id}")
-        
-        # Нормалізація тексту
-        text = self.normalize_text(text)
-        
-        # Логування
-        self.logger.info(f"Синтез: {len(text)} символів, спікер: {speaker_id}, швидкість: {speed}")
-        
-        # ====== ВАЖЛИВО: ЗАМІНІТЬ НА СПРАВЖНІЙ TTS ======
-        # Тут має бути виклик до справжнього синтезатора:
-        # audio, sample_rate = your_real_tts_function(text, voice, speed)
-        # ==============================================
-        
+        # 6. Синтез кожної частини
+        all_audio = []
         sample_rate = self.config['tts'].get('sample_rate', 24000)
         
-        # Генерація тестового аудіо (синусоїда) - ТІЛЬКИ ДЛЯ ТЕСТУВАННЯ
-        duration = max(1.0, len(text) / 20)
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        frequency = 440
-        audio = 0.5 * np.sin(2 * np.pi * frequency * t)
+        for i, part_text in enumerate(parts):
+            logger.debug(f"Синтез частини {i+1}/{len(parts)}: {len(part_text)} символів")
+            
+            try:
+                # Отримати модель та стиль
+                if voice:
+                    # Використовувати multi модель з вибраним голосом
+                    model, style = tts_models.get_multi_model(voice)
+                    if not style:
+                        raise RuntimeError(f"Стиль для голосу '{voice}' не знайдено")
+                else:
+                    # Використовувати single модель
+                    model, style = tts_models.get_single_model()
+                    if not style:
+                        raise RuntimeError("Single стиль не завантажено")
+                
+                # Підготувати текст для синтезу
+                # Тут потрібна обробка тексту (IPA, наголоси тощо)
+                # Для початку - проста реалізація
+                
+                # Виклик моделі для синтезу (замість заглушки)
+                # Це спрощена версія, потрібно адаптувати з оригінального коду
+                
+                # Імпортуємо необхідні модулі для обробки тексту
+                try:
+                    from ipa_uk import ipa
+                    from ukrainian_word_stress import Stressifier, StressSymbol
+                    import re
+                    from unicodedata import normalize
+                    
+                    # Обробка тексту (як у p_305_tts_gradio_main.py)
+                    stressify = Stressifier()
+                    t = part_text.replace('+', StressSymbol.CombiningAcuteAccent)
+                    t = normalize('NFKC', t)
+                    t = re.sub(r'[᠆‐‑‒–—―⁻₋−⸺⸻]', '-', t)
+                    t = re.sub(r' - ', ': ', t)
+                    
+                    # Конвертація в IPA
+                    ps = ipa(stressify(t))
+                    
+                    if not ps:
+                        logger.warning(f"Не вдалося конвертувати в IPA: {part_text[:50]}...")
+                        continue
+                    
+                    # Токенізація та синтез
+                    tokens = model.tokenizer.encode(ps)
+                    wav = model(tokens, speed=speed, s_prev=style)
+                    
+                    # Перетворення в numpy array
+                    if hasattr(wav, 'cpu'):
+                        wav = wav.cpu()
+                    
+                    audio_part = wav.numpy() if isinstance(wav, torch.Tensor) else np.array(wav)
+                    all_audio.append(audio_part)
+                    
+                except ImportError as e:
+                    logger.error(f"Відсутні залежності для синтезу: {e}")
+                    return self._generate_test_audio(text, speed)
+                except Exception as e:
+                    logger.error(f"Помилка синтезу частини: {e}")
+                    continue
+                
+            except Exception as e:
+                logger.error(f"Помилка обробки частини {i+1}: {e}")
+                continue
         
-        # Додаємо затухання
-        fade_samples = int(0.1 * sample_rate)
-        if len(audio) > fade_samples:
-            fade_in = np.linspace(0, 1, fade_samples)
-            fade_out = np.linspace(1, 0, fade_samples)
-            audio[:fade_samples] *= fade_in
-            audio[-fade_samples:] *= fade_out
+        # 7. Об'єднати всі частини
+        if not all_audio:
+            raise RuntimeError("Не вдалося синтезувати жодну частину")
         
-        # Збереження (якщо налаштовано)
+        concatenated = np.concatenate(all_audio)
+        duration = len(concatenated) / sample_rate
+        
+        # 8. Зберегти результат (якщо налаштовано)
         output_path = None
         if self.config['tts'].get('autosave', True):
-            output_path = self._save_audio(audio, sample_rate, speaker_id)
+            output_path = self._save_audio(concatenated, sample_rate, speaker_id)
         
-        # ====== ОНОВЛЕНО: Повертаємо dict з повною інформацією ======
-        result = {
-            'audio': audio,
+        # 9. Повернути результат
+        return {
+            'audio': concatenated,
             'sample_rate': sample_rate,
             'duration': duration,
             'speaker_id': speaker_id,
             'speed': speed,
             'voice': voice,
-            'output_path': output_path
+            'output_path': output_path,
+            'text': text,
+            'processed_text': processed_text
         }
         
-        return result
-    
-    def synthesize_batch(self, parts: List[TTSPart]) -> Generator[Dict[str, Any], None, None]:
-        """Пакетний синтез кількох частин."""
-        total = len(parts)
-        
-        for i, part in enumerate(parts, 1):
-            self.logger.info(f"Обробка частини {i}/{total}")
-            
-            yield self.synthesize(
-                text=part.text,
-                speaker_id=part.speaker_id,
-                speed=part.speed
-            )
-    
-    def _save_audio(self, audio: np.ndarray, sample_rate: int, speaker_id: int = 1) -> Optional[str]:
-        """Зберегти аудіо масив у файл."""
-        if not SOUNDFILE_AVAILABLE:
-            self.logger.warning("soundfile не доступний, збереження пропущено")
-            return None
-        
-        if not self.output_dir:
-            self.output_dir = self.config['tts'].get('output_dir', 'output_audio')
-            os.makedirs(self.output_dir, exist_ok=True)
-        
-        # Генерація імені файлу
-        timestamp = int(time.time())
-        filename = f"tts_{timestamp}_{speaker_id}.wav"
-        filepath = os.path.join(self.output_dir, filename)
-        
-        try:
-            sf.write(filepath, audio, sample_rate)
-            self.logger.info(f"Аудіо збережено: {filepath}")
-            return filepath
-        except Exception as e:
-            self.logger.error(f"Помилка збереження аудіо: {e}")
-            return None
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Отримати статус двигуна."""
-        return {
-            'initialized': self.is_initialized,
-            'session_id': self.current_session_id,
-            'output_dir': self.output_dir,
-            'available_voices': len(self.available_voices),
-            'config': {
-                'speaker_max': self.config['tts'].get('speaker_max', 30),
-                'default_speed': self.config['tts'].get('default_speed', 0.88),
-                'sample_rate': self.config['tts'].get('sample_rate', 24000)
-            },
-            'dependencies': {
-                'soundfile': SOUNDFILE_AVAILABLE,
-                'tokenizer': TOKENIZER_AVAILABLE
-            }
-        }
-    
-    def cleanup(self):
-        """Очищення ресурсів."""
-        self.logger.info("Очищення ресурсів TTSEngine")
-        self.is_initialized = False
-        self.current_session_id = None
+    except Exception as e:
+        logger.error(f"Критична помилка синтезу: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback до тестового аудіо
+        return self._generate_test_audio(text, speed)
 
-
-def prepare_config_models():
-    """Підготовка моделей конфігурації для TTS двигуна."""
-    return {}
-
-
-def initialize(app_context: Dict[str, Any]) -> TTSEngine:
-    """Ініціалізація TTS двигуна в контексті додатку."""
-    logger = app_context.get('logger')
-    if logger:
-        logger.info("Ініціалізація TTSEngine...")
+def _generate_test_audio(self, text: str, speed: float) -> Dict[str, Any]:
+    """
+    Генерує тестове аудіо (синусоїду) для відлагодження.
+    Використовується лише як fallback.
+    """
+    sample_rate = self.config['tts'].get('sample_rate', 24000)
+    duration = max(0.5, min(len(text) / 50, 10.0))  # Обмежити тривалість
     
-    # Створення двигуна
-    engine = TTSEngine(app_context)
+    # Різні частоти для різних спікерів
+    base_freq = 220 + (hash(text) % 880)
     
-    # Спроба ініціалізації
-    if engine.initialize():
-        app_context['tts_engine'] = engine
-        
-        # ====== ОНОВЛЕНО: Правильна реєстрація дій ======
-        action_registry = app_context.get('action_registry')
-        if action_registry:
-            try:
-                action_registry.register_action(
-                    "tts.synthesize",
-                    "🎤 Синтезувати текст",
-                    lambda text, speaker=1: engine.synthesize(text, speaker),
-                    "Швидкий синтез тексту в мову"
-                )
-                
-                action_registry.register_action(
-                    "tts.get_status",
-                    "📊 Статус TTS",
-                    engine.get_status,
-                    "Отримати статус TTS двигуна"
-                )
-                
-                action_registry.register_action(
-                    "tts.get_voices",
-                    "🎙️ Список голосів",
-                    engine.get_available_voices,
-                    "Отримати список доступних голосів"
-                )
-                
-                if logger:
-                    logger.info("✅ TTS дії успішно зареєстровано")
-            except Exception as e:
-                if logger:
-                    logger.warning(f"Не вдалося зареєструвати TTS дії: {e}")
-        
-        if logger:
-            logger.info("TTSEngine успішно ініціалізовано")
-        
-        return engine
-    else:
-        if logger:
-            logger.error("Не вдалося ініціалізувати TTSEngine")
-        return None
-
-
-def stop(app_context: Dict[str, Any]) -> None:
-    """Зупинка TTS двигуна."""
-    if 'tts_engine' in app_context:
-        app_context['tts_engine'].cleanup()
-        del app_context['tts_engine']
+    t = np.linspace(0, duration, int(sample_rate * duration))
     
-    logger = app_context.get('logger')
-    if logger:
-        logger.info("TTSEngine зупинено")
+    # Більш складна хвиля для більш природнього звуку
+    audio = 0.3 * np.sin(2 * np.pi * base_freq * t)
+    audio += 0.1 * np.sin(2 * np.pi * base_freq * 1.5 * t)
+    audio += 0.05 * np.sin(2 * np.pi * base_freq * 2 * t)
+    
+    # Затухання
+    fade_samples = int(0.05 * sample_rate)
+    if len(audio) > fade_samples:
+        fade_in = np.linspace(0, 1, fade_samples)
+        fade_out = np.linspace(1, 0, fade_samples)
+        audio[:fade_samples] *= fade_in
+        audio[-fade_samples:] *= fade_out
+    
+    # Нормалізація
+    audio = audio / np.max(np.abs(audio)) * 0.5
+    
+    return {
+        'audio': audio,
+        'sample_rate': sample_rate,
+        'duration': duration,
+        'speaker_id': 1,
+        'speed': speed,
+        'voice': 'test',
+        'output_path': None,
+        'is_test': True
+    }
