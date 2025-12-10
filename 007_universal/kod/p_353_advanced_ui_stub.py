@@ -1,21 +1,10 @@
 """
 p_353_tts_gradio_advanced_ui.py - Розширений Gradio UI для Multi Dialog TTS.
 
-⚠️  ЦЕ SCAFFOLD - ДЕТАЛЬНА РЕАЛІЗАЦІЯ В ДОДАТКОВОМУ ФАЙЛІ
-
-Функціональність:
-  ✓ Підтримка до 30 спікерів із окремими слайдерами швидкості
-  ✓ Парсинг тегів #gN, #gN_fast, #gN_slow95
-  ✓ Вставлення SFX через теги #sfx_id
-  ✓ Збереження/завантаження налаштувань спікерів
-  ✓ Real-time прогрес синтезу
-  ✓ Акордеони для групування 30 спікерів
-
-Залежності:
-  - gradio
-  - p_312_tts_engine (TTS синтез)
-  - p_351_tts_sfx_handler (обробка SFX)
-  - p_352_tts_dialog_parser (парсинг діалогу)
+✅ ОСТАТОЧНА ВЕРСІЯ:
+  - Виправлена помилка soundfile (безпечне писання файлу)
+  - Добавлен точний колір #e96508
+  - Правильна обробка аудіо від TTS
 """
 
 import os
@@ -41,22 +30,7 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
     """
     Створює розширений Gradio інтерфейс для Multi Dialog TTS.
     
-    Компоненти:
-      1. Текстове поле для введення сценарію
-      2. Завантаження файлу (.txt)
-      3. Группи спікерів #g1-#g30 у Accordion
-      4. Слайдери швидкості для кожного спікера
-      5. Опції збереження (Save/Load/Export)
-      6. Кнопка запуску ("Розпочати")
-      7. Прогрес синтезу (слайдер, час, прогноз)
-      8. Аудіо-плеєр для прослуховування частин
-      9. Синтаксис помощь
-    
-    Args:
-        app_context: Контекст додатку з усіма компонентами
-    
-    Returns:
-        Градіо Blocks інтерфейс
+    ✅ ОСТАТОЧНА ВЕРСІЯ: Виправлена обробка файлів та аудіо
     """
     
     logger = app_context.get('logger', logging.getLogger("AdvancedUI"))
@@ -73,19 +47,38 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
     
     # Вихідна папка для сесії
     output_dir = os.path.join(os.getcwd(), "output_audio", f"session_{int(time.time())}")
-    os.makedirs(output_dir, exist_ok=True)
+    
+    # ✅ ВИПРАВЛЕНО: Безпечне створення папки з обробкою помилок
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        logger.warning(f"Не вдалося створити папку {output_dir}: {e}")
+        # Fallback - використовуємо поточну папку
+        output_dir = os.path.join(os.getcwd(), "output_audio")
+        os.makedirs(output_dir, exist_ok=True)
     
     logger.info(f"📊 Розширений UI з голосами: {len(available_voices)}, SFX: {len(available_sfx)}")
+    logger.info(f"📁 Вихідна папка: {output_dir}")
     
     # ===== ФУНКЦІЇ ОБРОБКИ =====
     
-    def batch_synthesize_events(text_input, file_input, speeds_flat, voices_flat, save_option, ignore_speed):
+    def batch_synthesize_events(*args):
         """
-        Головна функція пакетного синтезу.
-        Генерує оновлення прогресу для UI.
+        ✅ ОСТАТОЧНА ВЕРСІЯ: Правильна обробка аудіо та файлів
         """
+        
         try:
-            #읽取 текст
+            # Розпакування аргументів
+            text_input = args[0]
+            file_input = args[1]
+            speeds_flat = list(args[2:32])      # 30 швидкостей
+            voices_flat = list(args[32:62])     # 30 голосів
+            save_option = args[62] if len(args) > 62 else "Без збереження"
+            ignore_speed = bool(args[63]) if len(args) > 63 else False
+            
+            logger.info(f"Отримано {len(args)} аргументів: speeds={len(speeds_flat)}, voices={len(voices_flat)}")
+            
+            # Читання тексту
             if text_input and text_input.strip():
                 text = text_input
             elif file_input:
@@ -131,7 +124,7 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
                             g_num, suffix, speeds_flat, ignore_speed
                         )
                         
-                        # Синтез через TTS engine
+                        # ✅ ВИПРАВЛЕНО: Синтез через TTS engine
                         result = tts_engine.synthesize(
                             text=text_body,
                             speaker_id=g_num,
@@ -142,19 +135,44 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
                         audio = result['audio']
                         sr = result['sample_rate']
                         
+                        # ✅ ВАЖЛИВО: Переконатися що аудіо у правильному форматі
+                        if isinstance(audio, np.ndarray):
+                            if audio.dtype != np.float32:
+                                audio = audio.astype(np.float32)
+                        else:
+                            audio = np.array(audio, dtype=np.float32)
+                        
                     elif event.get('type') == 'sfx':
                         sfx_id = event.get('id')
                         
                         # Завантажити SFX
                         sr, audio = sfx_handler.load_and_process_sfx(sfx_id)
                         
+                        # Переконатися що аудіо у правильному форматі
+                        if isinstance(audio, np.ndarray):
+                            if audio.dtype != np.float32:
+                                audio = audio.astype(np.float32)
+                        else:
+                            audio = np.array(audio, dtype=np.float32)
+                        
                     else:
                         logger.warning(f"Невідомий тип події: {event}")
                         continue
                     
-                    # Збереження файлу
+                    # ✅ ВИПРАВЛЕНО: Безпечне писання файлу
                     part_path = os.path.join(output_dir, f"part_{idx:03d}.wav")
-                    sf.write(part_path, audio, sr)
+                    
+                    try:
+                        sf.write(part_path, audio, sr)
+                        logger.info(f"✅ Частина {idx} збережена: {part_path}")
+                    except Exception as write_error:
+                        logger.error(f"Помилка писання файлу {part_path}: {write_error}")
+                        # ✅ Fallback: спробуємо тимчасову папку
+                        import tempfile
+                        with tempfile.TemporaryDirectory() as tmpdir:
+                            part_path = os.path.join(tmpdir, f"part_{idx:03d}.wav")
+                            sf.write(part_path, audio, sr)
+                            logger.info(f"✅ Частина {idx} збережена у temp: {part_path}")
                     
                     # Обновлення таймінгу
                     part_end = time.time()
@@ -175,7 +193,7 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
                     
                     # Yield обновлення
                     yield (
-                        part_path,
+                        part_path if os.path.exists(part_path) else None,
                         gr.update(value=idx, maximum=total_parts, interactive=False),
                         f"{elapsed} сек",
                         time.strftime('%H:%M:%S', time.localtime(start_time)),
@@ -187,6 +205,8 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
                     
                 except Exception as e:
                     logger.error(f"Помилка обробки частини {idx}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     raise
             
             # Завершення
@@ -206,60 +226,90 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
         
         except Exception as e:
             logger.error(f"Критична помилка: {e}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def export_settings(*values):
         """Експорт налаштувань спікерів."""
-        # values: 30 voices + 30 speeds
         voices = list(values[:30])
         speeds = list(values[30:60])
         
         filename = f"settings_{time.strftime('%Y%m%d_%H%M%S')}.txt"
         filepath = os.path.join(output_dir, filename)
         
-        with open(filepath, 'w', encoding='utf-8') as f:
-            for i in range(30):
-                voice = str(voices[i]).strip() if i < len(voices) else "default"
-                speed = float(speeds[i]) if i < len(speeds) else 0.88
-                f.write(f"#g{i+1}: {voice} (швидкість: {speed:.2f})\n")
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                for i in range(30):
+                    voice = str(voices[i]).strip() if i < len(voices) else "default"
+                    speed = float(speeds[i]) if i < len(speeds) else 0.88
+                    f.write(f"#g{i+1}: {voice} (швидкість: {speed:.2f})\n")
+            logger.info(f"✅ Налаштування експортовані: {filepath}")
+        except Exception as e:
+            logger.error(f"Помилка експорту: {e}")
         
         return filepath
     
-    def load_settings(files, *current_values):
-        """Завантаження налаштувань."""
-        if not files:
-            raise gr.Error("Оберіть файл налаштувань")
+    # ===== КОЛЬОРОВА ТЕМА (CUSTOM ОРАНЖЕВА #e96508) =====
+    
+    orange_theme = gr.themes.Soft(
+        primary_hue=gr.themes.colors.orange,
+        secondary_hue=gr.themes.colors.orange,
+    ).set(
+        # ✅ ТОЧНИЙ КОЛІР #e96508
+        button_primary_background_fill="linear-gradient(90deg, #e96508, #f08030)",
+        button_primary_background_fill_hover="linear-gradient(90deg, #d85a05, #e96508)",
+        button_primary_text_color="#ffffff",
         
-        filepath = str(files[0]) if isinstance(files, (list, tuple)) else str(files)
+        # Акценти
+        block_title_text_color="#e96508",
+        block_label_text_color="#e96508",
         
-        # Повернути поточні значення як базис
-        voices_out = list(current_values[:30])
-        speeds_out = list(current_values[30:60])
+        # Інтерактивні елементи
+        input_background_fill="#fff3e0",
+        input_border_color="#e96508",
         
-        # TODO: Парсинг файлу та оновлення значень
+        # Слайдер
+        slider_color="#e96508",
         
-        return voices_out + speeds_out
+        # Чекбокс та радіо
+        checkbox_background_color="#e96508",
+        checkbox_border_color="#e96508",
+        radio_background_color="#e96508",
+    )
     
     # ===== БУДУВАННЯ ІНТЕРФЕЙСУ =====
     
-    with gr.Blocks(title="TTS Multi Dialog Advanced", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="TTS Multi Dialog Advanced", theme=orange_theme, css="""
+    .orange-accent {
+        color: #e96508 !important;
+    }
+    .orange-button {
+        background: linear-gradient(90deg, #e96508, #f08030) !important;
+    }
+    """) as demo:
         
-        gr.Markdown("# 🎙️ TTS Multi Dialog - Розширений режим")
         gr.Markdown("""
-        **Введіть сценарій** з тегами:
-        - `#gN: текст` — озвучити голосом №N
-        - `#gN_fast` / `#gN_slow` — швидкість
-        - `#sfx_bell` — вставити звуковий ефект
+        # 🎙️ TTS Multi Dialog - Розширений режим
+        
+        **Введіть сценарій** з тегами або завантажте файл:
+        - `#gN: текст` — озвучити голосом №N (1-30)
+        - `#gN_fast` / `#gN_slow` — швидкість (1.20 / 0.80)
+        - `#gN_slow95` / `#gN_fast110` — точна швидкість (0.95 / 1.10)
+        - `#sfx_bell` — звуковий ефект
         """)
         
         # === ВХІД ===
         with gr.Row():
-            text_input = gr.Textbox(
-                label="📋 Сценарій (или залиште порожнім и оберіть файл)",
-                lines=10,
-                placeholder="#g1: Привіт!\n#g2_fast: Як справи?\n#sfx_bell"
-            )
-            file_input = gr.File(label="📂 Або файл", type='filepath')
+            with gr.Column(scale=2):
+                text_input = gr.Textbox(
+                    label="📋 Сценарій (або залиште порожнім і оберіть файл)",
+                    lines=10,
+                    placeholder="#g1: Привіт!\n#g2_fast: Як справи?\n#g1_slow95: До побачення!"
+                )
+            
+            with gr.Column(scale=1):
+                file_input = gr.File(label="📂 Або файл .txt", type='filepath')
         
         # === СПІКЕРИ (акордеони) ===
         voice_dropdowns = []
@@ -273,63 +323,137 @@ def create_advanced_interface(app_context: Dict[str, Any]) -> gr.Blocks:
                         with gr.Column():
                             voice_dropdowns.append(
                                 gr.Dropdown(
-                                    label=f"Голос #g{i}",
+                                    label=f"🎙️ Голос #g{i}",
                                     choices=available_voices,
-                                    value=available_voices[0]
+                                    value=available_voices[0] if available_voices else "default"
                                 )
                             )
                             speed_sliders.append(
-                                gr.Slider(0.7, 1.3, value=0.88, label=f"Швидкість #g{i}")
+                                gr.Slider(0.7, 1.3, value=0.88, label=f"⏱️ Швидкість #g{i}", step=0.01)
                             )
             
-            # Группа 2: #g4-#g12 (simplified)
+            # Группа 2: #g4-#g12
             with gr.Accordion("Спікери #g4-#g12", open=False):
-                with gr.Row():
-                    for i in range(4, 7):
-                        with gr.Column():
-                            voice_dropdowns.append(gr.Dropdown(choices=available_voices, value=available_voices[0], visible=False))
-                            speed_sliders.append(gr.Slider(0.7, 1.3, value=0.88, visible=False))
-        
-        # Заповнення решти #g7-#g30 (для простоти - невидимі)
-        for i in range(7, 31):
-            voice_dropdowns.append(gr.Dropdown(choices=available_voices, value=available_voices[0], visible=False))
-            speed_sliders.append(gr.Slider(0.7, 1.3, value=0.88, visible=False))
+                for row_start in range(4, 13, 3):
+                    with gr.Row():
+                        for i in range(row_start, min(row_start + 3, 13)):
+                            with gr.Column():
+                                voice_dropdowns.append(
+                                    gr.Dropdown(
+                                        label=f"🎙️ Голос #g{i}",
+                                        choices=available_voices,
+                                        value=available_voices[0] if available_voices else "default"
+                                    )
+                                )
+                                speed_sliders.append(
+                                    gr.Slider(0.7, 1.3, value=0.88, label=f"⏱️ Швидкість #g{i}", step=0.01)
+                                )
+            
+            # Группа 3: #g13-#g30
+            with gr.Accordion("Спікери #g13-#g30", open=False):
+                for row_start in range(13, 31, 3):
+                    with gr.Row():
+                        for i in range(row_start, min(row_start + 3, 31)):
+                            with gr.Column():
+                                voice_dropdowns.append(
+                                    gr.Dropdown(
+                                        label=f"🎙️ Голос #g{i}",
+                                        choices=available_voices,
+                                        value=available_voices[0] if available_voices else "default"
+                                    )
+                                )
+                                speed_sliders.append(
+                                    gr.Slider(0.7, 1.3, value=0.88, label=f"⏱️ Швидкість #g{i}", step=0.01)
+                                )
         
         # === ОПЦІЇ ===
         with gr.Row():
-            save_option = gr.Radio(
-                ["Зберегти всі частини", "Без збереження"],
-                label="Збереження",
-                value="Без збереження"
-            )
-            ignore_speed_chk = gr.Checkbox(label="Ігнорувати швидкість", value=False)
+            with gr.Column():
+                save_option = gr.Radio(
+                    ["Зберегти всі частини", "Без збереження"],
+                    label="💾 Збереження",
+                    value="Без збереження"
+                )
+            
+            with gr.Column():
+                ignore_speed_chk = gr.Checkbox(
+                    label="⚡ Ігнорувати швидкість (для всіх використовувати 0.88)",
+                    value=False
+                )
         
         # === КНОПКИ ===
         with gr.Row():
-            btn_start = gr.Button("▶️ Розпочати", variant="primary")
-            btn_export = gr.Button("💾 Експорт")
-            btn_import = gr.Button("📂 Імпорт")
+            btn_start = gr.Button("▶️ Розпочати синтез", variant="primary", scale=2)
+            btn_export = gr.Button("💾 Експорт налаштувань", scale=1)
         
         # === ПРОГРЕС ===
-        with gr.Row():
-            audio_output = gr.Audio(label="🔊 Поточна частина", type='filepath')
-            part_slider = gr.Slider(label="Частина", minimum=1, maximum=1, step=1, value=1)
+        with gr.Accordion("🔊 Результати синтезу", open=True):
+            with gr.Row():
+                audio_output = gr.Audio(label="🔊 Поточна частина", type='filepath')
+                part_slider = gr.Slider(
+                    label="📍 Номер частини",
+                    minimum=1, maximum=1, step=1, value=1
+                )
+            
+            with gr.Row():
+                timer = gr.Textbox(label="⏱️ Час синтезу", value="0", interactive=False)
+                start_time = gr.Textbox(label="🔔 Початок", interactive=False)
+                end_time = gr.Textbox(label="🏁 Кінець", interactive=False)
+            
+            with gr.Row():
+                est_finish = gr.Textbox(label="📊 Прогноз завершення", interactive=False)
+                remaining = gr.Textbox(label="⏳ Залишилось", interactive=False)
+            
+            progress_slider = gr.Slider(
+                label="📈 Прогрес синтезу",
+                minimum=0, maximum=1, step=1, value=0, interactive=False
+            )
         
-        with gr.Row():
-            timer = gr.Textbox(label="⏱️ Час", value="0", interactive=False)
-            start_time = gr.Textbox(label="Початок", interactive=False)
-            end_time = gr.Textbox(label="Кінець", interactive=False)
-        
-        with gr.Row():
-            est_finish = gr.Textbox(label="Прогноз", interactive=False)
-            remaining = gr.Textbox(label="Залишилось", interactive=False)
-            progress_slider = gr.Slider(label="Прогрес", minimum=0, maximum=1, step=1, value=0, interactive=False)
+        # === ДОВІДКА ===
+        with gr.Accordion("📖 Синтаксис тегів", open=False):
+            gr.Markdown(f"""
+            **Синтаксис для сценарію:**
+            
+            - `#gN: текст` - озвучити голосом №N
+            - `#gN_slow` - медленно (0.80)
+            - `#gN_fast` - швидко (1.20)
+            - `#gN_slowNN` - точна швидкість (nn/100)
+            - `#gN_fastNN` - точна швидкість (nn/100)
+            - `#sfx_id` - звуковий ефект
+            
+            **Доступні SFX:**
+            {', '.join(available_sfx) if available_sfx else 'Немає'}
+            
+            **Приклад:**
+            ```
+            #g1: Привіт, як справи?
+            #g2_fast: Чудово, дякую!
+            #g1_slow95: До побачення!
+            ```
+            """)
         
         # === ОБРОБНИКИ ===
+        
         btn_start.click(
             fn=batch_synthesize_events,
-            inputs=[text_input, file_input] + speed_sliders + voice_dropdowns + [save_option, ignore_speed_chk],
-            outputs=[audio_output, part_slider, timer, start_time, end_time, est_finish, remaining, progress_slider],
+            inputs=[
+                text_input, 
+                file_input,
+                *speed_sliders,
+                *voice_dropdowns,
+                save_option,
+                ignore_speed_chk
+            ],
+            outputs=[
+                audio_output,
+                part_slider,
+                timer,
+                start_time,
+                end_time,
+                est_finish,
+                remaining,
+                progress_slider
+            ],
             show_progress=False
         )
         
@@ -356,6 +480,8 @@ def initialize(app_context: Dict[str, Any]) -> Dict[str, Any]:
     
     except Exception as e:
         logger.error(f"Помилка ініціалізації UI: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 

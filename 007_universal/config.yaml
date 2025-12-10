@@ -7,6 +7,12 @@ app:
   mode: DEBUG
   name: Мій Модульний Проєкт
   version: 1.0.0
+dialog_parser:
+  char_cap: 1200
+  enabled: true
+  max_tokens: 280
+  plbert_safe: 480
+  speaker_max: 30
 error_handler:
   enabled: true
   log_errors: true

@@ -11,6 +11,46 @@ config_sources:
   priority: 100
   source: user:config.yaml
   value: 1.0.0
+- key: dialog_parser.char_cap
+  priority: 1000
+  source: module:p_310_tts_config
+  value: 1200
+- key: dialog_parser.char_cap
+  priority: 100
+  source: user:config.yaml
+  value: 1200
+- key: dialog_parser.enabled
+  priority: 1000
+  source: module:p_310_tts_config
+  value: true
+- key: dialog_parser.enabled
+  priority: 100
+  source: user:config.yaml
+  value: true
+- key: dialog_parser.max_tokens
+  priority: 1000
+  source: module:p_310_tts_config
+  value: 280
+- key: dialog_parser.max_tokens
+  priority: 100
+  source: user:config.yaml
+  value: 280
+- key: dialog_parser.plbert_safe
+  priority: 1000
+  source: module:p_310_tts_config
+  value: 480
+- key: dialog_parser.plbert_safe
+  priority: 100
+  source: user:config.yaml
+  value: 480
+- key: dialog_parser.speaker_max
+  priority: 1000
+  source: module:p_310_tts_config
+  value: 30
+- key: dialog_parser.speaker_max
+  priority: 100
+  source: user:config.yaml
+  value: 30
 - key: error_handler.enabled
   priority: 1000
   source: module:p_060_error_handler
@@ -159,48 +199,9 @@ config_sources:
   priority: 1000
   source: module:p_310_tts_config
   value: false
-- key: gradio_ui.analytics_enabled
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: false
-- key: gradio_ui.analytics_enabled
-  priority: 100
-  source: user:config.yaml
-  value: false
-- key: gradio_ui.height
-  priority: 1000
-  source: module:p_310_tts_config
-  value: 600
-- key: gradio_ui.height
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: 600
-- key: gradio_ui.height
-  priority: 100
-  source: user:config.yaml
-  value: 600
-- key: gradio_ui.port
-  priority: 1000
-  source: module:p_310_tts_config
-  value: 7860
-- key: gradio_ui.port
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: 7860
-- key: gradio_ui.port
-  priority: 100
-  source: user:config.yaml
-  value: 7860
-- key: gradio_ui.server_name
-  priority: 1000
-  source: module:p_310_tts_config
-  value: 0.0.0.0
-- key: gradio_ui.server_name
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: 0.0.0.0
 sections:
 - app
+- dialog_parser
 - error_handler
 - events
 - gradio_main
@@ -215,5 +216,5 @@ sections:
 - tts_models
 - universal_deps_checker
 - verbalizer
-total_sections: 15
-total_sources: 208
+total_sections: 16
+total_sources: 218
