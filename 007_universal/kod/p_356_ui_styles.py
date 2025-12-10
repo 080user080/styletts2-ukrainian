@@ -33,9 +33,6 @@ def get_orange_theme() -> gr.Theme:
         
         # Слайдер
         slider_color="#e96508",
-        
-        # Заголовки
-        heading_text_color="#e96508",
     )
 
 def get_custom_css() -> str:
