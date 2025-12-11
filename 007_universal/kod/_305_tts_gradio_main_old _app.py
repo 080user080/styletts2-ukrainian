@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 import logging
 import re
 from unicodedata import normalize
+from .p_100_logger import logger
 
 # Конфігурація
 from pydantic import BaseModel

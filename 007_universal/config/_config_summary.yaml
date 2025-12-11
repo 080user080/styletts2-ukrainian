@@ -136,10 +136,6 @@ config_sources:
   source: user:config.yaml
   value: INFO
 - key: gradio_main.analytics_enabled
-  priority: 1000
-  source: module:p_305_tts_gradio_main
-  value: false
-- key: gradio_main.analytics_enabled
   priority: 695
   source: file:305_305TtsGradioMain.yaml
   value: false
@@ -148,10 +144,6 @@ config_sources:
   source: user:config.yaml
   value: false
 - key: gradio_main.enabled
-  priority: 1000
-  source: module:p_305_tts_gradio_main
-  value: true
-- key: gradio_main.enabled
   priority: 695
   source: file:305_305TtsGradioMain.yaml
   value: true
@@ -160,10 +152,6 @@ config_sources:
   source: user:config.yaml
   value: true
 - key: gradio_main.port
-  priority: 1000
-  source: module:p_305_tts_gradio_main
-  value: 7860
-- key: gradio_main.port
   priority: 695
   source: file:305_305TtsGradioMain.yaml
   value: 7860
@@ -172,10 +160,6 @@ config_sources:
   source: user:config.yaml
   value: 7860
 - key: gradio_main.server_name
-  priority: 1000
-  source: module:p_305_tts_gradio_main
-  value: 0.0.0.0
-- key: gradio_main.server_name
   priority: 695
   source: file:305_305TtsGradioMain.yaml
   value: 0.0.0.0
@@ -183,10 +167,6 @@ config_sources:
   priority: 100
   source: user:config.yaml
   value: 0.0.0.0
-- key: gradio_main.share
-  priority: 1000
-  source: module:p_305_tts_gradio_main
-  value: false
 - key: gradio_main.share
   priority: 695
   source: file:305_305TtsGradioMain.yaml
@@ -199,6 +179,26 @@ config_sources:
   priority: 1000
   source: module:p_310_tts_config
   value: false
+- key: gradio_ui.analytics_enabled
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: false
+- key: gradio_ui.analytics_enabled
+  priority: 100
+  source: user:config.yaml
+  value: false
+- key: gradio_ui.height
+  priority: 1000
+  source: module:p_310_tts_config
+  value: 600
+- key: gradio_ui.height
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: 600
+- key: gradio_ui.height
+  priority: 100
+  source: user:config.yaml
+  value: 600
 sections:
 - app
 - dialog_parser
@@ -217,4 +217,4 @@ sections:
 - universal_deps_checker
 - verbalizer
 total_sections: 16
-total_sources: 218
+total_sources: 204

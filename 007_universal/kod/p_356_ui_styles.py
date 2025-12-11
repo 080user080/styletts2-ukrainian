@@ -1,7 +1,7 @@
 # p_356_ui_styles.py
 """
 Стилі та теми для розширеного UI Multi Dialog TTS.
-Кольорова схема #e96508, тема Gradio та CSS стилі.
+Кольорова схема #b54d04, тема Gradio та CSS стилі.
 """
 
 import gradio as gr
@@ -9,30 +9,30 @@ from typing import Dict, Any, Optional
 
 def get_orange_theme() -> gr.Theme:
     """
-    Створює та повертає оранжеву тему з основним кольором #e96508.
+    Створює та повертає оранжеву тему з основним кольором #b54d04.
     Використовує мінімальну кількість параметрів для сумісності з Gradio 3.x.
     """
     return gr.themes.Soft(
         primary_hue=gr.themes.colors.orange,
         secondary_hue=gr.themes.colors.orange,
     ).set(
-        # === ТОЧНИЙ КОЛІР #e96508 ===
+        # === ТОЧНИЙ КОЛІР #b54d04 ===
         # Тільки основні параметри, які підтримуються Gradio 3.x
         
         # Кнопки первинні
-        button_primary_background_fill="linear-gradient(90deg, #e96508, #f08030)",
-        button_primary_background_fill_hover="linear-gradient(90deg, #d85a05, #e96508)",
+        button_primary_background_fill="linear-gradient(90deg, #b54d04, #f08030)",
+        button_primary_background_fill_hover="linear-gradient(90deg, #d85a05, #b54d04)",
         button_primary_text_color="#ffffff",
         
         # Акценти блоків
-        block_title_text_color="#e96508",
-        block_label_text_color="#e96508",
+        block_title_text_color="#b54d04",
+        block_label_text_color="#b54d04",
         
         # Інтерактивні елементи вводу (обмежена підтримка)
         input_background_fill="#fff3e0",
         
         # Слайдер
-        slider_color="#e96508",
+        slider_color="#b54d04",
     )
 
 def get_custom_css() -> str:
@@ -43,26 +43,26 @@ def get_custom_css() -> str:
     return """
     /* Основні оранжеві акценти */
     .orange-accent {
-        color: #e96508 !important;
+        color: #b54d04 !important;
     }
     
     /* Кнопки */
     .orange-button {
-        background: linear-gradient(90deg, #e96508, #f08030) !important;
+        background: linear-gradient(90deg, #b54d04, #f08030) !important;
         color: white !important;
         border: 1px solid #d85a05 !important;
         transition: all 0.2s ease-in-out !important;
     }
     
     .orange-button:hover {
-        background: linear-gradient(90deg, #d85a05, #e96508) !important;
+        background: linear-gradient(90deg, #d85a05, #b54d04) !important;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(233, 101, 8, 0.3) !important;
     }
     
     /* Випадаючі списки */
     .gradio-dropdown {
-        border: 1px solid #e96508 !important;
+        border: 1px solid #b54d04 !important;
         border-radius: 4px !important;
     }
     
@@ -73,7 +73,7 @@ def get_custom_css() -> str:
     
     /* Текстові поля */
     textarea, input[type="text"] {
-        border: 1px solid #e96508 !important;
+        border: 1px solid #b54d04 !important;
         border-radius: 4px !important;
         background: #fff3e0 !important;
     }
@@ -85,18 +85,18 @@ def get_custom_css() -> str:
     
     /* Чекбокси та радіо кнопки через CSS */
     input[type="checkbox"], input[type="radio"] {
-        accent-color: #e96508 !important;
+        accent-color: #b54d04 !important;
     }
     
     /* Слайдери */
     input[type="range"]::-webkit-slider-thumb {
-        background: #e96508 !important;
+        background: #b54d04 !important;
         border: 2px solid white !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
     }
     
     input[type="range"]::-moz-range-thumb {
-        background: #e96508 !important;
+        background: #b54d04 !important;
         border: 2px solid white !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
     }
@@ -104,8 +104,8 @@ def get_custom_css() -> str:
     /* Аккордеони */
     .accordion > label {
         background: linear-gradient(90deg, #fff3e0, #ffffff) !important;
-        border-left: 4px solid #e96508 !important;
-        color: #e96508 !important;
+        border-left: 4px solid #b54d04 !important;
+        color: #b54d04 !important;
         font-weight: bold !important;
         border-radius: 4px !important;
     }
@@ -117,8 +117,8 @@ def get_custom_css() -> str:
     }
     
     .tab-nav button.selected {
-        color: #e96508 !important;
-        border-bottom: 3px solid #e96508 !important;
+        color: #b54d04 !important;
+        border-bottom: 3px solid #b54d04 !important;
         font-weight: bold !important;
     }
     
@@ -159,7 +159,7 @@ def get_custom_css() -> str:
     }
     
     .example-card:hover {
-        border-color: #e96508 !important;
+        border-color: #b54d04 !important;
         box-shadow: 0 4px 12px rgba(233, 101, 8, 0.1) !important;
         transform: translateY(-2px) !important;
     }
@@ -186,7 +186,7 @@ def get_simple_theme() -> gr.Theme:
     )
 
 # Константи для використання в інших модулях
-ORANGE_PRIMARY = "#e96508"
+ORANGE_PRIMARY = "#b54d04"
 ORANGE_SECONDARY = "#f08030"
 ORANGE_LIGHT = "#fff3e0"
 ORANGE_DARK = "#d85a05"

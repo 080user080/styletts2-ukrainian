@@ -238,23 +238,23 @@ class AdvancedUI:
             primary_hue=gr.themes.colors.orange,
             secondary_hue=gr.themes.colors.orange,
         ).set(
-            # Точний колір #e96508
-            button_primary_background_fill="linear-gradient(90deg, #e96508, #f08030)",
-            button_primary_background_fill_hover="linear-gradient(90deg, #d85a05, #e96508)",
+            # Точний колір ##b54d04
+            button_primary_background_fill="linear-gradient(90deg, ##b54d04, #f08030)",
+            button_primary_background_fill_hover="linear-gradient(90deg, #d85a05, ##b54d04)",
             button_primary_text_color="#ffffff",
-            block_title_text_color="#e96508",
-            block_label_text_color="#e96508",
+            block_title_text_color="##b54d04",
+            block_label_text_color="##b54d04",
             input_background_fill="#fff3e0",
-            input_border_color="#e96508",
-            slider_color="#e96508",
-            checkbox_background_color="#e96508",
-            checkbox_border_color="#e96508",
+            input_border_color="##b54d04",
+            slider_color="##b54d04",
+            checkbox_background_color="##b54d04",
+            checkbox_border_color="##b54d04",
             
         )
         
         with gr.Blocks(title="TTS Multi Dialog Advanced", theme=orange_theme, css="""
-        .orange-accent { color: #e96508 !important; }
-        .orange-button { background: linear-gradient(90deg, #e96508, #f08030) !important; }
+        .orange-accent { color: ##b54d04 !important; }
+        .orange-button { background: linear-gradient(90deg, ##b54d04, #f08030) !important; }
         """) as demo:
             
             gr.Markdown("""

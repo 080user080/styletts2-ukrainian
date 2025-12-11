@@ -1,10 +1,9 @@
 # Автоматично згенеровано UniversalDepsChecker
-# Загалом пакетів: 25
+# Загалом пакетів: 23
 
 ast
 colorama>=0.4.6
 enum
-glob
 gradio>=5.31.0
 importlib
 inspect
@@ -16,7 +15,6 @@ pydantic>=2.11.5
 scipy>=1.15.3
 shutil
 soundfile>=0.13.1
-styletts2_inference
 subprocess
 tempfile
 threading

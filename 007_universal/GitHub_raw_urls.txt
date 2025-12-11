@@ -2,7 +2,7 @@
 RAG-Навігатор для ШІ
 ##########
 
-# Автоматично згенеровано: 2025-12-11 20:41:33
+# Автоматично згенеровано: 2025-12-11 21:45:12
 # Репозиторій: 080user080/styletts2-ukrainian
 # Гілка: main
 # Папка: 007_universal/kod
@@ -13,8 +13,26 @@ RAG-Навігатор для ШІ
 
 (Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)
 
+[ 305 Tts Gradio Main Old  App] _305_tts_gradio_main_old _app.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_305_tts_gradio_main_old _app.py
+
 [  Init  ] __init__.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/__init__.py
+
+[ Off P 300 Test Actions] _off_p_300_test_actions.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_300_test_actions.py
+
+[ Off P 302 Verbalizer] _off_p_302_verbalizer.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_302_verbalizer.py
+
+[ Off P 303 Tts Models] _off_p_303_tts_models.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_303_tts_models.py
+
+[ Off P 304 Tts Verbalizer Wrapper] _off_p_304_tts_verbalizer_wrapper.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_304_tts_verbalizer_wrapper.py
+
+[ Off P 350 Tts Gradio] _off_p_350_tts_gradio.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_350_tts_gradio.py
 
 [ Smart Patch Gui] _smart_patch_gui.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_smart_patch_gui.py
@@ -61,29 +79,11 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 [Logger] p_100_logger.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_100_logger.py
 
-[Test Actions] p_300_test_actions.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_300_test_actions.py
-
-[Verbalizer] p_302_verbalizer.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_302_verbalizer.py
-
-[Tts Models] p_303_tts_models.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_303_tts_models.py
-
-[Tts Verbalizer Wrapper] p_304_tts_verbalizer_wrapper.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_304_tts_verbalizer_wrapper.py
-
-[Tts Gradio Main] p_305_tts_gradio_main.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_305_tts_gradio_main.py
-
 [Tts Config] p_310_tts_config.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_310_tts_config.py
 
 [Tts Engine] p_312_tts_engine.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_312_tts_engine.py
-
-[Tts Gradio] p_350_tts_gradio.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_350_tts_gradio.py
 
 [Sfx Handler] p_351_sfx_handler.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_351_sfx_handler.py
@@ -199,28 +199,6 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_100_logger.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_100_logger.py
 
-## TTS - Текст в мову (5 файлів)
-
-• Test Actions
-  Файл: p_300_test_actions.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_300_test_actions.py
-
-• Verbalizer
-  Файл: p_302_verbalizer.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_302_verbalizer.py
-
-• Tts Models
-  Файл: p_303_tts_models.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_303_tts_models.py
-
-• Tts Verbalizer Wrapper
-  Файл: p_304_tts_verbalizer_wrapper.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_304_tts_verbalizer_wrapper.py
-
-• Tts Gradio Main
-  Файл: p_305_tts_gradio_main.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_305_tts_gradio_main.py
-
 ## Група 31 (2 файлів)
 
 • Tts Config
@@ -231,11 +209,7 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_312_tts_engine.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_312_tts_engine.py
 
-## UI - Користувацький інтерфейс (9 файлів)
-
-• Tts Gradio
-  Файл: p_350_tts_gradio.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_350_tts_gradio.py
+## UI - Користувацький інтерфейс (8 файлів)
 
 • Sfx Handler
   Файл: p_351_sfx_handler.py
@@ -297,11 +271,35 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_996_gui_launcher.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_996_gui_launcher.py
 
-## Інші файли (4 файлів)
+## Інші файли (10 файлів)
+
+•  305 Tts Gradio Main Old  App
+  Файл: _305_tts_gradio_main_old _app.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_305_tts_gradio_main_old _app.py
 
 •   Init  
   Файл: __init__.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/__init__.py
+
+•  Off P 300 Test Actions
+  Файл: _off_p_300_test_actions.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_300_test_actions.py
+
+•  Off P 302 Verbalizer
+  Файл: _off_p_302_verbalizer.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_302_verbalizer.py
+
+•  Off P 303 Tts Models
+  Файл: _off_p_303_tts_models.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_303_tts_models.py
+
+•  Off P 304 Tts Verbalizer Wrapper
+  Файл: _off_p_304_tts_verbalizer_wrapper.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_304_tts_verbalizer_wrapper.py
+
+•  Off P 350 Tts Gradio
+  Файл: _off_p_350_tts_gradio.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_off_p_350_tts_gradio.py
 
 •  Smart Patch Gui
   Файл: _smart_patch_gui.py
@@ -321,7 +319,7 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 ##########
 
 Загальна кількість файлів: 37
-Дата генерації: 2025-12-11 20:41:33
+Дата генерації: 2025-12-11 21:45:12
 Репозиторій: 080user080/styletts2-ukrainian
 Гілка: main
 Папка: 007_universal/kod
@@ -339,3 +337,4 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 Версія: 3.0 (автоматичне сканування з ігноруванням)
 
 ##########
+Даю дозвіл відкривати всі посилання які я тут виклав.

@@ -58,8 +58,8 @@ def create_advanced_interface(app_context: Dict[str, Any], theme: gr.Theme) -> g
         title="TTS Multi Dialog Advanced", 
         theme=theme, 
         css="""
-        .orange-accent { color: #e96508 !important; }
-        .orange-button { background: linear-gradient(90deg, #e96508, #f08030) !important; }
+        .orange-accent { color: #b54d04 !important; }
+        .orange-button { background: linear-gradient(90deg, #b54d04, #f08030) !important; }
         """
     ) as demo:
         
