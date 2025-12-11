@@ -1,132 +1,105 @@
 """
 p_910_github_url_updater.py
-Автономний модуль для оновлення RAW посилань GitHub при запуску системи
+Універсальний автономний генератор RAW посилань GitHub
 Номер: 910
-Версія: 1.0
 """
 
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
-class GitHubURLUpdater:
-    """Автономний оновлювач RAW посилань GitHub"""
+class UniversalURLGenerator:
+    """Універсальний генератор RAW посилань GitHub"""
     
-    # Конфігурація репозиторію
+    # Конфігурація репозиторію - можна змінювати без зміни коду
     REPO_OWNER = "080user080"
     REPO_NAME = "styletts2-ukrainian"
     BRANCH = "main"
     BASE_PATH = "007_universal/kod"
     
-    # Шляхи файлів
+    # Шлях для збереження результатів
     OUTPUT_FILE = "GitHub_raw_urls.txt"
-    LOG_FILE = "system.log"  # Основний лог проекту
-    
-    # Список всіх модулів проекту
-    MODULES = [
-        # Core (0-199)
-        ("Loader", "p_000_loader.py", "Основний завантажувач модулів"),
-        ("Config Collector", "p_010_config_collector.py", "Збір конфігурації"),
-        ("Config Updater", "p_012_config_updater.py", "Оновлення конфігурації"),
-        ("Config Tools", "p_015_config_tool.py", "Інструменти конфігурації"),
-        ("Config Validator", "p_020_config_validator.py", "Валідація конфігурації"),
-        ("Deps Checker", "p_050_universal_deps_checker.py", "Перевірка залежностей"),
-        ("Error Handler", "p_060_error_handler.py", "Обробка помилок"),
-        ("Event Types", "p_070_event_types.py", "Типи подій"),
-        ("Event System", "p_075_events.py", "Система подій"),
-        ("Registry", "p_080_registry.py", "Реєстр компонентів"),
-        ("GUI Manager", "p_090_gui_manager.py", "Менеджер GUI"),
-        ("Logger", "p_100_logger.py", "Система логування"),
-        
-        # TTS (300-349)
-        ("TTS Verbalizer", "p_302_verbalizer.py", "Вербалізатор TTS"),
-        ("TTS Models Loader", "p_303_tts_models.py", "Завантажувач моделей TTS"),
-        ("TTS Wrapper", "p_304_tts_verbalizer_wrapper.py", "Обгортка TTS"),
-        ("TTS Main GUI", "p_305_tts_gradio_main.py", "Головний GUI TTS"),
-        ("TTS Config", "p_310_tts_config.py", "Конфігурація TTS"),
-        ("TTS Engine", "p_312_tts_engine.py", "Двигун TTS"),
-        
-        # UI (350-399)
-        ("Advanced UI Core", "p_353_advanced_ui_core.py", "Ядро розширеного UI"),
-        ("UI Builder", "p_354_ui_builder.py", "Будівельник UI"),
-        ("UI Handlers", "p_355_ui_handlers.py", "Обробники UI"),
-        ("UI Styles", "p_356_ui_styles.py", "Стилі UI"),
-        ("UI Utils", "p_357_ui_utils.py", "Утиліти UI"),
-        
-        # AI Helper (900-949)
-        ("AI Helper", "p_902_ai_helper.py", "AI помічник"),
-        
-        # Launcher (990-999)
-        ("Launcher", "p_996_gui_launcher.py", "Запускач GUI"),
-        
-        # Спеціальні (910)
-        ("GitHub URL Updater", "p_910_github_url_updater.py", "Оновлювач RAW посилань"),
-    ]
     
     @staticmethod
     def _get_timestamp() -> str:
-        """Повертає поточну дату та час у форматі рядка"""
+        """Повертає поточну дату та час"""
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     @staticmethod
     def _build_raw_url(filename: str) -> str:
         """Будує RAW URL для файлу"""
-        return f"https://raw.githubusercontent.com/{GitHubURLUpdater.REPO_OWNER}/{GitHubURLUpdater.REPO_NAME}/{GitHubURLUpdater.BRANCH}/{GitHubURLUpdater.BASE_PATH}/{filename}"
+        return f"https://raw.githubusercontent.com/{UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}/{UniversalURLGenerator.BRANCH}/{UniversalURLGenerator.BASE_PATH}/{filename}"
     
     @staticmethod
-    def _log_to_console(message: str, message_type: str = "INFO"):
-        """Логування повідомлення в консоль"""
-        timestamp = GitHubURLUpdater._get_timestamp()
-        
-        # Кольорові коди для консолі
-        colors = {
-            "INFO": "\033[94m",    # Синій
-            "SUCCESS": "\033[92m",  # Зелений
-            "WARNING": "\033[93m",  # Жовтий
-            "ERROR": "\033[91m",    # Червоний
-            "RESET": "\033[0m",     # Скидання
-        }
-        
-        color = colors.get(message_type, colors["INFO"])
-        print(f"{color}[{timestamp}] [{message_type}] {message}{colors['RESET']}")
-    
-    @staticmethod
-    def _log_to_file(message: str, message_type: str = "INFO"):
-        """Логування повідомлення у файл system.log"""
-        try:
-            timestamp = GitHubURLUpdater._get_timestamp()
-            log_entry = f"[{timestamp}] [{message_type}] {message}\n"
+    def _get_all_modules() -> list:
+        """
+        Повертає список всіх модулів з їх описом
+        Цей список можна редагувати без зміни коду
+        """
+        return [
+            # Core modules
+            ("Loader", "p_000_loader.py"),
+            ("Config Collector", "p_010_config_collector.py"),
+            ("Config Updater", "p_012_config_updater.py"),
+            ("Config Tools", "p_015_config_tool.py"),
+            ("Config Validator", "p_020_config_validator.py"),
+            ("Deps Checker", "p_050_universal_deps_checker.py"),
+            ("Error Handler", "p_060_error_handler.py"),
+            ("Event Types", "p_070_event_types.py"),
+            ("Event System", "p_075_events.py"),
+            ("Registry", "p_080_registry.py"),
+            ("GUI Manager", "p_090_gui_manager.py"),
+            ("Logger", "p_100_logger.py"),
             
-            # Додаємо запис у кінець файлу
-            with open(GitHubURLUpdater.LOG_FILE, 'a', encoding='utf-8') as log_file:
-                log_file.write(log_entry)
-        except Exception as e:
-            # Якщо не вдалося записати в файл, пишемо в консоль
-            print(f"Помилка логування в файл: {e}")
+            # TTS modules
+            ("TTS Verbalizer", "p_302_verbalizer.py"),
+            ("TTS Models Loader", "p_303_tts_models.py"),
+            ("TTS Wrapper", "p_304_tts_verbalizer_wrapper.py"),
+            ("TTS Main GUI", "p_305_tts_gradio_main.py"),
+            ("TTS Config", "p_310_tts_config.py"),
+            ("TTS Engine", "p_312_tts_engine.py"),
+            
+            # UI modules
+            ("Advanced UI Core", "p_353_advanced_ui_core.py"),
+            ("UI Builder", "p_354_ui_builder.py"),
+            ("UI Handlers", "p_355_ui_handlers.py"),
+            ("UI Styles", "p_356_ui_styles.py"),
+            ("UI Utils", "p_357_ui_utils.py"),
+            
+            # Helper modules
+            ("AI Helper", "p_902_ai_helper.py"),
+            ("Launcher", "p_996_gui_launcher.py"),
+            
+            # Special - цей модуль
+            ("GitHub URL Generator", "p_910_github_url_updater.py"),
+        ]
     
     @staticmethod
-    def _log(message: str, message_type: str = "INFO"):
-        """Комбіноване логування (консоль + файл)"""
-        GitHubURLUpdater._log_to_console(message, message_type)
-        GitHubURLUpdater._log_to_file(message, message_type)
+    def _log(message: str):
+        """Логування в консоль"""
+        timestamp = UniversalURLGenerator._get_timestamp()
+        print(f"[{timestamp}] [URL Updater] {message}")
     
     @staticmethod
-    def _generate_rag_section() -> str:
-        """Генерує секцію RAG-навігатора"""
-        lines = []
+    def _generate_rag_navigation() -> str:
+        """Генерує RAG-навігацію"""
+        timestamp = UniversalURLGenerator._get_timestamp()
         
-        lines.append("=" * 80)
-        lines.append("RAG-Навігатор для ШІ")
-        lines.append("=" * 80)
-        lines.append("")
-        lines.append("1 RAG-Навігатор для ШІ")
-        lines.append("Формат: Роль → RAW URL")
-        lines.append("")
-        lines.append("(Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)")
-        lines.append("")
+        lines = [
+            f"# Автоматично згенеровано: {timestamp}",
+            f"# Репозиторій: {UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}",
+            f"# Гілка: {UniversalURLGenerator.BRANCH}",
+            "",
+            "1 RAG-Навігатор для ШІ",
+            "Формат: Роль → RAW URL",
+            "",
+            "(Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)",
+            "",
+        ]
         
-        for module_name, filename, _ in GitHubURLUpdater.MODULES:
-            raw_url = GitHubURLUpdater._build_raw_url(filename)
+        for module_name, filename in UniversalURLGenerator._get_all_modules():
+            raw_url = UniversalURLGenerator._build_raw_url(filename)
             lines.append(f"[{module_name}] {filename}")
             lines.append(raw_url)
             lines.append("")
@@ -134,73 +107,81 @@ class GitHubURLUpdater:
         return "\n".join(lines)
     
     @staticmethod
-    def _generate_architecture_section() -> str:
-        """Генерує секцію архітектурної мапи"""
-        lines = []
+    def _generate_architecture_map() -> str:
+        """Генерує архітектурну мапу"""
+        lines = [
+            "2 Архітектурна мапа проекту",
+            "",
+        ]
         
-        lines.append("=" * 80)
-        lines.append("Архітектурна мапа проекту")
-        lines.append("=" * 80)
-        lines.append("")
-        lines.append("2 Архітектурна мапа")
-        lines.append("")
-        
-        # Групуємо модулі за категоріями
+        # Групування за категоріями
         categories = {
-            "Ядро системи": ["Loader", "Logger", "Registry", "Error Handler", "Event System"],
-            "Конфігурація": ["Config Collector", "Config Updater", "Config Tools", "Config Validator"],
-            "Графічний інтерфейс": ["GUI Manager", "Advanced UI Core", "UI Builder", "UI Handlers"],
-            "TTS система": ["TTS Engine", "TTS Verbalizer", "TTS Models Loader", "TTS Config"],
-            "Утиліти": ["Deps Checker", "AI Helper", "GitHub URL Updater"],
-            "Запуск": ["Launcher"],
+            "Ядро системи": [
+                ("Loader", "p_000_loader.py"),
+                ("Logger", "p_100_logger.py"),
+                ("Registry", "p_080_registry.py"),
+            ],
+            "Конфігурація": [
+                ("Config Collector", "p_010_config_collector.py"),
+                ("Config Updater", "p_012_config_updater.py"),
+                ("Config Validator", "p_020_config_validator.py"),
+            ],
+            "UI/UX": [
+                ("GUI Manager", "p_090_gui_manager.py"),
+                ("Advanced UI Core", "p_353_advanced_ui_core.py"),
+                ("UI Builder", "p_354_ui_builder.py"),
+            ],
+            "TTS система": [
+                ("TTS Engine", "p_312_tts_engine.py"),
+                ("TTS Models Loader", "p_303_tts_models.py"),
+                ("TTS Config", "p_310_tts_config.py"),
+            ],
+            "Утиліти": [
+                ("Error Handler", "p_060_error_handler.py"),
+                ("Deps Checker", "p_050_universal_deps_checker.py"),
+                ("AI Helper", "p_902_ai_helper.py"),
+            ],
         }
         
-        for category, module_names in categories.items():
-            lines.append(f"## {category}")
+        for category_name, modules in categories.items():
+            lines.append(f"## {category_name}")
             lines.append("")
             
-            for module_name in module_names:
-                # Шукаємо модуль за іменем
-                for m_name, filename, description in GitHubURLUpdater.MODULES:
-                    if m_name == module_name:
-                        raw_url = GitHubURLUpdater._build_raw_url(filename)
-                        lines.append(f"### {m_name}")
-                        lines.append(f"Опис: {description}")
-                        lines.append(f"Файл: {filename}")
-                        lines.append(f"RAW URL: {raw_url}")
-                        lines.append("")
-                        break
+            for module_name, filename in modules:
+                raw_url = UniversalURLGenerator._build_raw_url(filename)
+                lines.append(f"• {module_name}")
+                lines.append(f"  Файл: {filename}")
+                lines.append(f"  RAW: {raw_url}")
+                lines.append("")
         
         return "\n".join(lines)
     
     @staticmethod
     def _generate_info_section() -> str:
         """Генерує інформаційну секцію"""
-        timestamp = GitHubURLUpdater._get_timestamp()
-        total_modules = len(GitHubURLUpdater.MODULES)
+        total_modules = len(UniversalURLGenerator._get_all_modules())
         
-        lines = []
-        lines.append("=" * 80)
-        lines.append("Інформація про генерацію")
-        lines.append("=" * 80)
-        lines.append("")
-        lines.append(f"Дата генерації: {timestamp}")
-        lines.append(f"Загальна кількість модулів: {total_modules}")
-        lines.append(f"Репозиторій: {GitHubURLUpdater.REPO_OWNER}/{GitHubURLUpdater.REPO_NAME}")
-        lines.append(f"Гілка: {GitHubURLUpdater.BRANCH}")
-        lines.append(f"Базова директорія: {GitHubURLUpdater.BASE_PATH}")
-        lines.append("")
-        lines.append("Файл оновлюється автоматично при кожному запуску системи.")
-        lines.append("Модуль: p_910_github_url_updater.py")
-        lines.append("")
-        lines.append("=" * 80)
+        lines = [
+            "#" * 50,
+            "ІНФОРМАЦІЯ",
+            "#" * 50,
+            "",
+            f"Всього модулів: {total_modules}",
+            f"Модуль оновлення: p_910_github_url_updater.py",
+            "Файл оновлюється автоматично при кожному запуску.",
+            "",
+            "# Щоб змінити список модулів - редагуйте метод _get_all_modules()",
+            "# Щоб змінити репозиторій - змініть змінні REPO_* вгорі класу",
+            "",
+            "#" * 50,
+        ]
         
         return "\n".join(lines)
     
     @staticmethod
-    def update_urls() -> dict:
+    def generate_urls_file() -> dict:
         """
-        Оновлює файл з RAW посиланнями
+        Генерує файл з усіма RAW посиланнями
         
         Returns:
             dict: Результат операції
@@ -208,111 +189,107 @@ class GitHubURLUpdater:
         result = {
             "success": False,
             "message": "",
-            "output_file": GitHubURLUpdater.OUTPUT_FILE,
-            "timestamp": GitHubURLUpdater._get_timestamp(),
-            "modules_count": len(GitHubURLUpdater.MODULES),
+            "file": UniversalURLGenerator.OUTPUT_FILE,
+            "timestamp": UniversalURLGenerator._get_timestamp(),
         }
         
         try:
-            # Логуємо початок оновлення
-            GitHubURLUpdater._log("Початок оновлення RAW посилань GitHub", "INFO")
+            UniversalURLGenerator._log("Початок генерації RAW посилань...")
             
             # Генеруємо всі секції
-            rag_section = GitHubURLUpdater._generate_rag_section()
-            arch_section = GitHubURLUpdater._generate_architecture_section()
-            info_section = GitHubURLUpdater._generate_info_section()
+            rag_section = UniversalURLGenerator._generate_rag_navigation()
+            arch_section = UniversalURLGenerator._generate_architecture_map()
+            info_section = UniversalURLGenerator._generate_info_section()
             
-            # Об'єднуємо всі секції
+            # Об'єднуємо
             full_content = f"{rag_section}\n\n{arch_section}\n\n{info_section}"
             
             # Записуємо у файл
-            with open(GitHubURLUpdater.OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            with open(UniversalURLGenerator.OUTPUT_FILE, 'w', encoding='utf-8') as f:
                 f.write(full_content)
             
-            # Перевіряємо, чи файл створено
-            if os.path.exists(GitHubURLUpdater.OUTPUT_FILE):
-                file_size = os.path.getsize(GitHubURLUpdater.OUTPUT_FILE)
-                
+            # Перевіряємо
+            if os.path.exists(UniversalURLGenerator.OUTPUT_FILE):
+                file_size = os.path.getsize(UniversalURLGenerator.OUTPUT_FILE)
                 result["success"] = True
-                result["message"] = f"Файл успішно оновлено ({file_size} байт)"
+                result["message"] = f"Успішно згенеровано ({file_size} байт)"
                 result["file_size"] = file_size
+                result["modules"] = len(UniversalURLGenerator._get_all_modules())
                 
-                # Логуємо успіх
-                GitHubURLUpdater._log(result["message"], "SUCCESS")
+                UniversalURLGenerator._log(result["message"])
             else:
-                result["message"] = "Файл не було створено"
-                GitHubURLUpdater._log(result["message"], "ERROR")
+                result["message"] = "Помилка: файл не було створено"
+                UniversalURLGenerator._log(result["message"])
                 
         except Exception as e:
             result["message"] = f"Помилка: {str(e)}"
-            GitHubURLUpdater._log(result["message"], "ERROR")
+            UniversalURLGenerator._log(result["message"])
         
         return result
     
     @staticmethod
-    def show_status():
-        """Показує статус оновлення та інформацію про файл"""
+    def show_quick_status():
+        """Показує короткий статус"""
         print("\n" + "=" * 60)
-        print("GitHub RAW URL Updater (v910)")
+        print("GitHub RAW URL Generator (v910)")
         print("=" * 60)
         
-        # Виконуємо оновлення
-        result = GitHubURLUpdater.update_urls()
+        result = UniversalURLGenerator.generate_urls_file()
         
-        # Виводимо статус
         if result["success"]:
             print(f"✅ Статус: УСПІШНО")
         else:
             print(f"❌ Статус: ПОМИЛКА")
         
-        print(f"📝 Повідомлення: {result['message']}")
-        print(f"📁 Вихідний файл: {result['output_file']}")
-        print(f"📦 Модулів: {result['modules_count']}")
+        print(f"📄 Файл: {result['file']}")
+        print(f"📦 Модулів: {result.get('modules', 'N/A')}")
+        print(f"📊 Розмір: {result.get('file_size', 'N/A')} байт")
         print(f"🕐 Час: {result['timestamp']}")
-        
-        # Додаткова інформація про файл
-        if result.get("file_size"):
-            print(f"📊 Розмір файлу: {result['file_size']} байт")
-        
         print("=" * 60)
         
-        # Показуємо декілька прикладів посилань
-        print("\n📋 Приклади RAW посилань:")
+        # Показуємо декілька прикладів
+        print("\n📋 Приклади посилань:")
         print("-" * 40)
         
-        # Вибираємо декілька важливих модулів для демонстрації
-        important_modules = [
+        examples = [
             ("Loader", "p_000_loader.py"),
             ("TTS Engine", "p_312_tts_engine.py"),
             ("Launcher", "p_996_gui_launcher.py"),
-            ("GitHub URL Updater", "p_910_github_url_updater.py"),
         ]
         
-        for module_name, filename in important_modules:
-            raw_url = GitHubURLUpdater._build_raw_url(filename)
+        for module_name, filename in examples:
+            raw_url = UniversalURLGenerator._build_raw_url(filename)
             print(f"\n{module_name}:")
-            print(f"{filename}")
             print(f"{raw_url}")
         
         print("\n" + "=" * 60)
-        print(f"Файл '{GitHubURLUpdater.OUTPUT_FILE}' готовий до використання!")
-        print("=" * 60)
 
 
-# Автоматичне виконання при запуску модуля
+# Автоматичне виконання
 if __name__ == "__main__":
-    # Запуск у режимі автономного виконання
-    GitHubURLUpdater.show_status()
+    # Якщо модуль запущено напряму
+    UniversalURLGenerator.show_quick_status()
     
-    # Чекаємо натискання Enter перед закриттям
-    input("\nНатисніть Enter для завершення...")
+    # Запит на перегляд файлу
+    try:
+        response = input("\nПереглянути згенерований файл? (y/n): ")
+        if response.lower() in ['y', 'так', 'yes']:
+            with open(UniversalURLGenerator.OUTPUT_FILE, 'r', encoding='utf-8') as f:
+                print("\n" + "=" * 80)
+                print("ЗМІСТ ФАЙЛУ GitHub_raw_urls.txt:")
+                print("=" * 80)
+                content = f.read()
+                print(content[:1500] + "..." if len(content) > 1500 else content)
+                print("=" * 80)
+    except:
+        pass
 
 else:
-    # Якщо модуль імпортовано - автоматично оновлюємо посилання
-    print(f"\n[GitHubURLUpdater] Запуск оновлення RAW посилань...")
-    result = GitHubURLUpdater.update_urls()
+    # Якщо модуль імпортовано - автоматично виконуємо генерацію
+    result = UniversalURLGenerator.generate_urls_file()
     
+    # Повідомляємо в консоль
     if result["success"]:
-        print(f"[GitHubURLUpdater] ✅ {result['message']}")
+        print(f"[URL Updater] ✅ {result['message']}")
     else:
-        print(f"[GitHubURLUpdater] ❌ {result['message']}")
+        print(f"[URL Updater] ❌ {result['message']}")
