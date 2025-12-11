@@ -1,6 +1,7 @@
 """
 p_910_github_url_updater.py
 Універсальний автономний генератор RAW посилань GitHub
+Автоматично сканує всі файли в папці kod (ігнорує __pycache__ та інше)
 Номер: 910
 """
 
@@ -12,14 +13,21 @@ from pathlib import Path
 class UniversalURLGenerator:
     """Універсальний генератор RAW посилань GitHub"""
     
-    # Конфігурація репозиторію - можна змінювати без зміни коду
+    # Конфігурація репозиторію
     REPO_OWNER = "080user080"
     REPO_NAME = "styletts2-ukrainian"
     BRANCH = "main"
-    BASE_PATH = "007_universal/kod"
+    
+    # Папка для сканування (відносно кореня репозиторію)
+    REPO_FOLDER = "007_universal/kod"
     
     # Шлях для збереження результатів
     OUTPUT_FILE = "GitHub_raw_urls.txt"
+    
+    # Списки для ігнорування
+    IGNORE_DIRS = ['__pycache__', '.git', '.vscode', '.idea', 'node_modules']
+    IGNORE_FILES = ['.gitignore', '.DS_Store', 'thumbs.db', 'desktop.ini']
+    IGNORE_EXTENSIONS = ['.pyc', '.pyo', '.pyd', '.so', '.dll', '.exe']
     
     @staticmethod
     def _get_timestamp() -> str:
@@ -27,69 +35,153 @@ class UniversalURLGenerator:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     @staticmethod
-    def _build_raw_url(filename: str) -> str:
+    def _build_raw_url(relative_path: str) -> str:
         """Будує RAW URL для файлу"""
-        return f"https://raw.githubusercontent.com/{UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}/{UniversalURLGenerator.BRANCH}/{UniversalURLGenerator.BASE_PATH}/{filename}"
+        return f"https://raw.githubusercontent.com/{UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}/{UniversalURLGenerator.BRANCH}/{relative_path}"
     
     @staticmethod
-    def _get_all_modules() -> list:
+    def _should_ignore(filepath: str, is_dir: bool = False) -> bool:
+        """Перевіряє, чи потрібно ігнорувати файл/папку"""
+        name = os.path.basename(filepath)
+        
+        if is_dir:
+            return name in UniversalURLGenerator.IGNORE_DIRS
+        
+        # Ігноруємо приховані файли, що починаються з крапки
+        if name.startswith('.'):
+            return True
+            
+        # Ігноруємо файли з певних списків
+        if name.lower() in UniversalURLGenerator.IGNORE_FILES:
+            return True
+            
+        # Ігноруємо файли з певними розширеннями
+        ext = os.path.splitext(name)[1].lower()
+        if ext in UniversalURLGenerator.IGNORE_EXTENSIONS:
+            return True
+            
+        return False
+    
+    @staticmethod
+    def _scan_folder() -> list:
         """
-        Повертає список всіх модулів з їх описом
-        Цей список можна редагувати без зміни коду
+        Сканує всю папку kod та повертає список всіх корисних файлів
+        Повертає список кортежів: (ім'я_файлу, відносний_шлях)
         """
-        return [
-            # Core modules
-            ("Loader", "p_000_loader.py"),
-            ("Config Collector", "p_010_config_collector.py"),
-            ("Config Updater", "p_012_config_updater.py"),
-            ("Config Tools", "p_015_config_tool.py"),
-            ("Config Validator", "p_020_config_validator.py"),
-            ("Deps Checker", "p_050_universal_deps_checker.py"),
-            ("Error Handler", "p_060_error_handler.py"),
-            ("Event Types", "p_070_event_types.py"),
-            ("Event System", "p_075_events.py"),
-            ("Registry", "p_080_registry.py"),
-            ("GUI Manager", "p_090_gui_manager.py"),
-            ("Logger", "p_100_logger.py"),
+        files_list = []
+        
+        # Використовуємо поточну робочу директорію
+        current_dir = os.getcwd()
+        
+        # Шукаємо папку kod
+        kod_path = None
+        
+        # Спроба 1: шукаємо в поточній директорії
+        if os.path.exists("kod"):
+            kod_path = "kod"
+        # Спроба 2: шукаємо за повним шляхом
+        elif os.path.exists("007_universal/kod"):
+            kod_path = "007_universal/kod"
+        # Спроба 3: рекурсивний пошук
+        else:
+            for root, dirs, files in os.walk(current_dir):
+                if "kod" in dirs:
+                    kod_path = os.path.join(root, "kod")
+                    break
+        
+        if not kod_path or not os.path.exists(kod_path):
+            print(f"[ERROR] Папка 'kod' не знайдена в {current_dir}")
+            print(f"[INFO] Поточний шлях: {current_dir}")
+            print(f"[INFO] Спробуйте запустити з кореня проекту")
+            return []
+        
+        print(f"[INFO] Сканування папки: {kod_path}")
+        print(f"[INFO] Ігнорування: {UniversalURLGenerator.IGNORE_DIRS}")
+        
+        # Рекурсивно скануємо всі файли
+        scanned = 0
+        ignored = 0
+        
+        for root, dirs, files in os.walk(kod_path):
+            # Видаляємо папки зі списку ігнорування
+            dirs[:] = [d for d in dirs if not UniversalURLGenerator._should_ignore(d, True)]
             
-            # TTS modules
-            ("TTS Verbalizer", "p_302_verbalizer.py"),
-            ("TTS Models Loader", "p_303_tts_models.py"),
-            ("TTS Wrapper", "p_304_tts_verbalizer_wrapper.py"),
-            ("TTS Main GUI", "p_305_tts_gradio_main.py"),
-            ("TTS Config", "p_310_tts_config.py"),
-            ("TTS Engine", "p_312_tts_engine.py"),
-            
-            # UI modules
-            ("Advanced UI Core", "p_353_advanced_ui_core.py"),
-            ("UI Builder", "p_354_ui_builder.py"),
-            ("UI Handlers", "p_355_ui_handlers.py"),
-            ("UI Styles", "p_356_ui_styles.py"),
-            ("UI Utils", "p_357_ui_utils.py"),
-            
-            # Helper modules
-            ("AI Helper", "p_902_ai_helper.py"),
-            ("Launcher", "p_996_gui_launcher.py"),
-            
-            # Special - цей модуль
-            ("GitHub URL Generator", "p_910_github_url_updater.py"),
-        ]
+            for file in files:
+                scanned += 1
+                
+                # Перевіряємо, чи потрібно ігнорувати файл
+                if UniversalURLGenerator._should_ignore(file, False):
+                    ignored += 1
+                    continue
+                
+                # Повний шлях до файлу
+                full_path = os.path.join(root, file)
+                
+                # Відносний шлях від папки kod
+                if root == kod_path:
+                    relative_path = file
+                else:
+                    # Видаляємо шлях до kod з початку
+                    rel_root = os.path.relpath(root, kod_path)
+                    relative_path = os.path.join(rel_root, file)
+                
+                # Додаємо в список
+                files_list.append((file, relative_path))
+        
+        # Сортуємо за іменем файлу
+        files_list.sort(key=lambda x: x[0].lower())
+        
+        print(f"[INFO] Проскановано файлів: {scanned}")
+        print(f"[INFO] Проігноровано файлів: {ignored}")
+        print(f"[INFO] Знайдено корисних файлів: {len(files_list)}")
+        
+        return files_list
+    
+    @staticmethod
+    def _get_module_name(filename: str) -> str:
+        """
+        Генерує читабельну назву модуля з імені файлу
+        Приклад: p_000_loader.py -> Loader
+        """
+        # Видаляємо розширення
+        name_without_ext = os.path.splitext(filename)[0]
+        
+        # Видаляємо префікс p_ та номери
+        if name_without_ext.startswith("p_"):
+            # Видаляємо "p_" та все до першого підкреслення після номера
+            parts = name_without_ext.split("_")
+            if len(parts) >= 2:
+                # Знаходимо першу нечислову частину після номера
+                for i, part in enumerate(parts[1:], 1):
+                    if not part.isdigit() and part:
+                        # З'єднуємо всі наступні частини
+                        result = " ".join(parts[i:])
+                        return result.replace("_", " ").title()
+        
+        # Якщо не вдалося розібрати, повертаємо оригінальне ім'я
+        return name_without_ext.replace("_", " ").title()
     
     @staticmethod
     def _log(message: str):
         """Логування в консоль"""
         timestamp = UniversalURLGenerator._get_timestamp()
-        print(f"[{timestamp}] [URL Updater] {message}")
+        print(f"[{timestamp}] [URL Generator] {message}")
     
     @staticmethod
-    def _generate_rag_navigation() -> str:
-        """Генерує RAG-навігацію"""
+    def _generate_rag_navigation(files: list) -> str:
+        """Генерує RAG-навігацію зі списку файлів"""
         timestamp = UniversalURLGenerator._get_timestamp()
         
         lines = [
+            "#" * 10,
+            "RAG-Навігатор для ШІ",
+            "#" * 10,
+            "",
             f"# Автоматично згенеровано: {timestamp}",
             f"# Репозиторій: {UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}",
             f"# Гілка: {UniversalURLGenerator.BRANCH}",
+            f"# Папка: {UniversalURLGenerator.REPO_FOLDER}",
+            f"# Знайдено файлів: {len(files)}",
             "",
             "1 RAG-Навігатор для ШІ",
             "Формат: Роль → RAW URL",
@@ -98,8 +190,9 @@ class UniversalURLGenerator:
             "",
         ]
         
-        for module_name, filename in UniversalURLGenerator._get_all_modules():
-            raw_url = UniversalURLGenerator._build_raw_url(filename)
+        for filename, relative_path in files:
+            module_name = UniversalURLGenerator._get_module_name(filename)
+            raw_url = UniversalURLGenerator._build_raw_url(f"{UniversalURLGenerator.REPO_FOLDER}/{relative_path}")
             lines.append(f"[{module_name}] {filename}")
             lines.append(raw_url)
             lines.append("")
@@ -107,73 +200,99 @@ class UniversalURLGenerator:
         return "\n".join(lines)
     
     @staticmethod
-    def _generate_architecture_map() -> str:
+    def _generate_architecture_map(files: list) -> str:
         """Генерує архітектурну мапу"""
         lines = [
-            "2 Архітектурна мапа проекту",
+            "#" * 10,
+            "Архітектурна мапа проекту",
+            "#" * 10,
+            "",
+            "2 Архітектурна мапа",
+            "",
+            "Файлова структура:",
             "",
         ]
         
-        # Групування за категоріями
-        categories = {
-            "Ядро системи": [
-                ("Loader", "p_000_loader.py"),
-                ("Logger", "p_100_logger.py"),
-                ("Registry", "p_080_registry.py"),
-            ],
-            "Конфігурація": [
-                ("Config Collector", "p_010_config_collector.py"),
-                ("Config Updater", "p_012_config_updater.py"),
-                ("Config Validator", "p_020_config_validator.py"),
-            ],
-            "UI/UX": [
-                ("GUI Manager", "p_090_gui_manager.py"),
-                ("Advanced UI Core", "p_353_advanced_ui_core.py"),
-                ("UI Builder", "p_354_ui_builder.py"),
-            ],
-            "TTS система": [
-                ("TTS Engine", "p_312_tts_engine.py"),
-                ("TTS Models Loader", "p_303_tts_models.py"),
-                ("TTS Config", "p_310_tts_config.py"),
-            ],
-            "Утиліти": [
-                ("Error Handler", "p_060_error_handler.py"),
-                ("Deps Checker", "p_050_universal_deps_checker.py"),
-                ("AI Helper", "p_902_ai_helper.py"),
-            ],
+        # Групуємо файли за префіксами
+        prefix_groups = {}
+        for filename, relative_path in files:
+            # Отримуємо префікс (перші 2 символи після p_)
+            if filename.startswith("p_") and len(filename) > 4:
+                prefix = filename[2:4]  # Наприклад, "00" для p_000_loader.py
+            else:
+                prefix = "other"
+            
+            if prefix not in prefix_groups:
+                prefix_groups[prefix] = []
+            
+            prefix_groups[prefix].append((filename, relative_path))
+        
+        # Опис префіксів
+        prefix_descriptions = {
+            "00": "Core - Ядро системи (завантажувачі, ініціалізація)",
+            "01": "Config - Конфігурація",
+            "02": "Config - Конфігурація (додатково)",
+            "05": "Deps - Залежності",
+            "06": "Error - Обробка помилок",
+            "07": "Events - Система подій",
+            "08": "Registry - Реєстр",
+            "09": "GUI - Графічний інтерфейс",
+            "10": "Logger - Логування",
+            "30": "TTS - Текст в мову",
+            "35": "UI - Користувацький інтерфейс",
+            "90": "AI - Штучний інтелект",
+            "99": "Launcher - Запуск системи",
+            "other": "Інші файли",
         }
         
-        for category_name, modules in categories.items():
-            lines.append(f"## {category_name}")
+        # Сортуємо групи за ключем
+        for prefix in sorted(prefix_groups.keys()):
+            group_files = prefix_groups[prefix]
+            
+            # Опис групи
+            description = prefix_descriptions.get(prefix, f"Група {prefix}")
+            lines.append(f"## {description} ({len(group_files)} файлів)")
             lines.append("")
             
-            for module_name, filename in modules:
-                raw_url = UniversalURLGenerator._build_raw_url(filename)
+            for filename, relative_path in group_files:
+                module_name = UniversalURLGenerator._get_module_name(filename)
+                raw_url = UniversalURLGenerator._build_raw_url(f"{UniversalURLGenerator.REPO_FOLDER}/{relative_path}")
                 lines.append(f"• {module_name}")
                 lines.append(f"  Файл: {filename}")
+                if relative_path != filename:
+                    lines.append(f"  Шлях: {relative_path}")
                 lines.append(f"  RAW: {raw_url}")
                 lines.append("")
         
         return "\n".join(lines)
     
     @staticmethod
-    def _generate_info_section() -> str:
+    def _generate_info_section(files_count: int) -> str:
         """Генерує інформаційну секцію"""
-        total_modules = len(UniversalURLGenerator._get_all_modules())
-        
         lines = [
-            "#" * 50,
-            "ІНФОРМАЦІЯ",
-            "#" * 50,
+            "#" * 10,
+            "ІНФОРМАЦІЯ ПРО ГЕНЕРАЦІЮ",
+            "#" * 10,
             "",
-            f"Всього модулів: {total_modules}",
-            f"Модуль оновлення: p_910_github_url_updater.py",
-            "Файл оновлюється автоматично при кожному запуску.",
+            f"Загальна кількість файлів: {files_count}",
+            f"Дата генерації: {UniversalURLGenerator._get_timestamp()}",
+            f"Репозиторій: {UniversalURLGenerator.REPO_OWNER}/{UniversalURLGenerator.REPO_NAME}",
+            f"Гілка: {UniversalURLGenerator.BRANCH}",
+            f"Папка: {UniversalURLGenerator.REPO_FOLDER}",
             "",
-            "# Щоб змінити список модулів - редагуйте метод _get_all_modules()",
-            "# Щоб змінити репозиторій - змініть змінні REPO_* вгорі класу",
+            "АВТОМАТИЧНА ГЕНЕРАЦІЯ",
+            "Файл автоматично оновлюється при кожному запуску системи.",
+            "Модуль сканує всі файли в папці 'kod' і генерує RAW посилання.",
             "",
-            "#" * 50,
+            "ІГНОРУВАННЯ:",
+            f"• Папки: {', '.join(UniversalURLGenerator.IGNORE_DIRS)}",
+            f"• Файли: {', '.join(UniversalURLGenerator.IGNORE_FILES)}",
+            f"• Розширення: {', '.join(UniversalURLGenerator.IGNORE_EXTENSIONS)}",
+            "",
+            "МОДУЛЬ: p_910_github_url_updater.py",
+            "Версія: 3.0 (автоматичне сканування з ігноруванням)",
+            "",
+            "#" * 10,
         ]
         
         return "\n".join(lines)
@@ -191,15 +310,27 @@ class UniversalURLGenerator:
             "message": "",
             "file": UniversalURLGenerator.OUTPUT_FILE,
             "timestamp": UniversalURLGenerator._get_timestamp(),
+            "files_count": 0,
         }
         
         try:
-            UniversalURLGenerator._log("Початок генерації RAW посилань...")
+            UniversalURLGenerator._log("Початок сканування папки 'kod'...")
+            
+            # Скануємо всі файли
+            files = UniversalURLGenerator._scan_folder()
+            
+            if not files:
+                result["message"] = "Не знайдено жодного корисного файлу в папці 'kod'"
+                UniversalURLGenerator._log(result["message"])
+                return result
+            
+            result["files_count"] = len(files)
+            UniversalURLGenerator._log(f"Знайдено корисних файлів: {len(files)}")
             
             # Генеруємо всі секції
-            rag_section = UniversalURLGenerator._generate_rag_navigation()
-            arch_section = UniversalURLGenerator._generate_architecture_map()
-            info_section = UniversalURLGenerator._generate_info_section()
+            rag_section = UniversalURLGenerator._generate_rag_navigation(files)
+            arch_section = UniversalURLGenerator._generate_architecture_map(files)
+            info_section = UniversalURLGenerator._generate_info_section(len(files))
             
             # Об'єднуємо
             full_content = f"{rag_section}\n\n{arch_section}\n\n{info_section}"
@@ -212,9 +343,8 @@ class UniversalURLGenerator:
             if os.path.exists(UniversalURLGenerator.OUTPUT_FILE):
                 file_size = os.path.getsize(UniversalURLGenerator.OUTPUT_FILE)
                 result["success"] = True
-                result["message"] = f"Успішно згенеровано ({file_size} байт)"
+                result["message"] = f"Успішно згенеровано ({file_size} байт, {len(files)} файлів)"
                 result["file_size"] = file_size
-                result["modules"] = len(UniversalURLGenerator._get_all_modules())
                 
                 UniversalURLGenerator._log(result["message"])
             else:
@@ -228,11 +358,11 @@ class UniversalURLGenerator:
         return result
     
     @staticmethod
-    def show_quick_status():
-        """Показує короткий статус"""
-        print("\n" + "=" * 60)
-        print("GitHub RAW URL Generator (v910)")
-        print("=" * 60)
+    def show_status():
+        """Показує статус генерації"""
+        print("\n" + "=" * 70)
+        print("GitHub RAW URL Generator (v910 - Auto Scan with Ignore)")
+        print("=" * 70)
         
         result = UniversalURLGenerator.generate_urls_file()
         
@@ -241,46 +371,59 @@ class UniversalURLGenerator:
         else:
             print(f"❌ Статус: ПОМИЛКА")
         
-        print(f"📄 Файл: {result['file']}")
-        print(f"📦 Модулів: {result.get('modules', 'N/A')}")
-        print(f"📊 Розмір: {result.get('file_size', 'N/A')} байт")
-        print(f"🕐 Час: {result['timestamp']}")
-        print("=" * 60)
+        print(f"📄 Вихідний файл: {result['file']}")
+        print(f"📦 Корисних файлів: {result['files_count']}")
         
-        # Показуємо декілька прикладів
-        print("\n📋 Приклади посилань:")
-        print("-" * 40)
+        if result.get('file_size'):
+            print(f"📊 Розмір файлу: {result['file_size']} байт")
         
-        examples = [
-            ("Loader", "p_000_loader.py"),
-            ("TTS Engine", "p_312_tts_engine.py"),
-            ("Launcher", "p_996_gui_launcher.py"),
-        ]
+        print(f"🕐 Час генерації: {result['timestamp']}")
         
-        for module_name, filename in examples:
-            raw_url = UniversalURLGenerator._build_raw_url(filename)
-            print(f"\n{module_name}:")
-            print(f"{raw_url}")
+        # Показуємо, що ігнорується
+        print(f"🚫 Ігнорується: __pycache__, .git, .pyc та інше")
         
-        print("\n" + "=" * 60)
+        print("=" * 70)
+        
+        # Показуємо перші 5 файлів як приклад
+        if result["files_count"] > 0:
+            print("\n📋 Перші 5 файлів зі списку:")
+            print("-" * 40)
+            
+            # Отримуємо список файлів ще раз для демонстрації
+            files = UniversalURLGenerator._scan_folder()
+            if files:
+                for i, (filename, relative_path) in enumerate(files[:5]):
+                    module_name = UniversalURLGenerator._get_module_name(filename)
+                    print(f"\n{i+1}. {module_name}:")
+                    print(f"   Файл: {filename}")
+                    if relative_path != filename:
+                        print(f"   Шлях: {relative_path}")
+        
+        print("\n" + "=" * 70)
+        print(f"📁 Файл '{UniversalURLGenerator.OUTPUT_FILE}' готовий до використання!")
+        print("=" * 70)
 
 
 # Автоматичне виконання
 if __name__ == "__main__":
     # Якщо модуль запущено напряму
-    UniversalURLGenerator.show_quick_status()
+    UniversalURLGenerator.show_status()
     
     # Запит на перегляд файлу
     try:
-        response = input("\nПереглянути згенерований файл? (y/n): ")
+        response = input("\n📄 Переглянути згенерований файл? (y/n): ")
         if response.lower() in ['y', 'так', 'yes']:
-            with open(UniversalURLGenerator.OUTPUT_FILE, 'r', encoding='utf-8') as f:
-                print("\n" + "=" * 80)
-                print("ЗМІСТ ФАЙЛУ GitHub_raw_urls.txt:")
-                print("=" * 80)
-                content = f.read()
-                print(content[:1500] + "..." if len(content) > 1500 else content)
-                print("=" * 80)
+            if os.path.exists(UniversalURLGenerator.OUTPUT_FILE):
+                with open(UniversalURLGenerator.OUTPUT_FILE, 'r', encoding='utf-8') as f:
+                    print("\n" + "=" * 80)
+                    print("ЗМІСТ ФАЙЛУ GitHub_raw_urls.txt:")
+                    print("=" * 80)
+                    content = f.read()
+                    # Показуємо тільки перші 2000 символів
+                    print(content[:2000] + "..." if len(content) > 2000 else content)
+                    print("=" * 80)
+            else:
+                print("❌ Файл не знайдено.")
     except:
         pass
 
@@ -290,6 +433,6 @@ else:
     
     # Повідомляємо в консоль
     if result["success"]:
-        print(f"[URL Updater] ✅ {result['message']}")
+        print(f"[URL Generator] ✅ {result['message']}")
     else:
-        print(f"[URL Updater] ❌ {result['message']}")
+        print(f"[URL Generator] ❌ {result['message']}")

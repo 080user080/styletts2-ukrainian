@@ -249,7 +249,7 @@ class AdvancedUI:
             slider_color="#e96508",
             checkbox_background_color="#e96508",
             checkbox_border_color="#e96508",
-            radio_background_color="#e96508",
+            
         )
         
         with gr.Blocks(title="TTS Multi Dialog Advanced", theme=orange_theme, css="""
