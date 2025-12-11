@@ -1,0 +1,226 @@
+================================================================================
+RAG-Навігатор для ШІ
+================================================================================
+
+1 RAG-Навігатор для ШІ
+Формат: Роль → RAW URL
+
+(Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)
+
+[Loader] p_000_loader.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_000_loader.py
+
+[Config Collector] p_010_config_collector.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_010_config_collector.py
+
+[Config Updater] p_012_config_updater.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_012_config_updater.py
+
+[Config Tools] p_015_config_tool.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_015_config_tool.py
+
+[Config Validator] p_020_config_validator.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_020_config_validator.py
+
+[Deps Checker] p_050_universal_deps_checker.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_050_universal_deps_checker.py
+
+[Error Handler] p_060_error_handler.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_060_error_handler.py
+
+[Event Types] p_070_event_types.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_070_event_types.py
+
+[Event System] p_075_events.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_075_events.py
+
+[Registry] p_080_registry.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_080_registry.py
+
+[GUI Manager] p_090_gui_manager.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_090_gui_manager.py
+
+[Logger] p_100_logger.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_100_logger.py
+
+[TTS Verbalizer] p_302_verbalizer.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_302_verbalizer.py
+
+[TTS Models Loader] p_303_tts_models.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_303_tts_models.py
+
+[TTS Wrapper] p_304_tts_verbalizer_wrapper.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_304_tts_verbalizer_wrapper.py
+
+[TTS Main GUI] p_305_tts_gradio_main.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_305_tts_gradio_main.py
+
+[TTS Config] p_310_tts_config.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_310_tts_config.py
+
+[TTS Engine] p_312_tts_engine.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_312_tts_engine.py
+
+[Advanced UI Core] p_353_advanced_ui_core.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_advanced_ui_core.py
+
+[UI Builder] p_354_ui_builder.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_354_ui_builder.py
+
+[UI Handlers] p_355_ui_handlers.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_355_ui_handlers.py
+
+[UI Styles] p_356_ui_styles.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_356_ui_styles.py
+
+[UI Utils] p_357_ui_utils.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_357_ui_utils.py
+
+[AI Helper] p_902_ai_helper.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_902_ai_helper.py
+
+[Launcher] p_996_gui_launcher.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_996_gui_launcher.py
+
+[GitHub URL Updater] p_910_github_url_updater.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_910_github_url_updater.py
+
+
+================================================================================
+Архітектурна мапа проекту
+================================================================================
+
+2 Архітектурна мапа
+
+## Ядро системи
+
+### Loader
+Опис: Основний завантажувач модулів
+Файл: p_000_loader.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_000_loader.py
+
+### Logger
+Опис: Система логування
+Файл: p_100_logger.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_100_logger.py
+
+### Registry
+Опис: Реєстр компонентів
+Файл: p_080_registry.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_080_registry.py
+
+### Error Handler
+Опис: Обробка помилок
+Файл: p_060_error_handler.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_060_error_handler.py
+
+### Event System
+Опис: Система подій
+Файл: p_075_events.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_075_events.py
+
+## Конфігурація
+
+### Config Collector
+Опис: Збір конфігурації
+Файл: p_010_config_collector.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_010_config_collector.py
+
+### Config Updater
+Опис: Оновлення конфігурації
+Файл: p_012_config_updater.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_012_config_updater.py
+
+### Config Tools
+Опис: Інструменти конфігурації
+Файл: p_015_config_tool.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_015_config_tool.py
+
+### Config Validator
+Опис: Валідація конфігурації
+Файл: p_020_config_validator.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_020_config_validator.py
+
+## Графічний інтерфейс
+
+### GUI Manager
+Опис: Менеджер GUI
+Файл: p_090_gui_manager.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_090_gui_manager.py
+
+### Advanced UI Core
+Опис: Ядро розширеного UI
+Файл: p_353_advanced_ui_core.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_advanced_ui_core.py
+
+### UI Builder
+Опис: Будівельник UI
+Файл: p_354_ui_builder.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_354_ui_builder.py
+
+### UI Handlers
+Опис: Обробники UI
+Файл: p_355_ui_handlers.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_355_ui_handlers.py
+
+## TTS система
+
+### TTS Engine
+Опис: Двигун TTS
+Файл: p_312_tts_engine.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_312_tts_engine.py
+
+### TTS Verbalizer
+Опис: Вербалізатор TTS
+Файл: p_302_verbalizer.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_302_verbalizer.py
+
+### TTS Models Loader
+Опис: Завантажувач моделей TTS
+Файл: p_303_tts_models.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_303_tts_models.py
+
+### TTS Config
+Опис: Конфігурація TTS
+Файл: p_310_tts_config.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_310_tts_config.py
+
+## Утиліти
+
+### Deps Checker
+Опис: Перевірка залежностей
+Файл: p_050_universal_deps_checker.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_050_universal_deps_checker.py
+
+### AI Helper
+Опис: AI помічник
+Файл: p_902_ai_helper.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_902_ai_helper.py
+
+### GitHub URL Updater
+Опис: Оновлювач RAW посилань
+Файл: p_910_github_url_updater.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_910_github_url_updater.py
+
+## Запуск
+
+### Launcher
+Опис: Запускач GUI
+Файл: p_996_gui_launcher.py
+RAW URL: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_996_gui_launcher.py
+
+
+================================================================================
+Інформація про генерацію
+================================================================================
+
+Дата генерації: 2025-12-11 19:23:20
+Загальна кількість модулів: 26
+Репозиторій: 080user080/styletts2-ukrainian
+Гілка: main
+Базова директорія: 007_universal/kod
+
+Файл оновлюється автоматично при кожному запуску системи.
+Модуль: p_910_github_url_updater.py
+
+================================================================================
