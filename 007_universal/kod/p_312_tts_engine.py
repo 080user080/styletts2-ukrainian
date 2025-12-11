@@ -37,6 +37,22 @@ class TTSEngine:
             'verbalizer': bool(self.app_context.get('verbalizer'))
         }
 
+    def get_available_voices(self):
+        """
+        Повертає список доступних голосів з моделей TTS.
+        Отримує голоси з контексту або TTS моделей.
+        """
+        # Спроба отримати з контексту додатку
+        if hasattr(self, 'app_context') and 'available_voices' in self.app_context:
+            return self.app_context['available_voices']
+        
+        # Спроба отримати з TTS моделей
+        if hasattr(self, 'tts_models') and self.tts_models:
+            return self.tts_models.get_available_voices()
+        
+        # Запасний варіант - стандартний список
+        return ['filatov', 'liana', 'kristina', 'denis']  # приклад
+
     def synthesize(self, text: str, speaker_id: int = 1, speed: float = None,
                    voice: str = None) -> SimpleNamespace:
         if not self.is_initialized and not self.initialize():
