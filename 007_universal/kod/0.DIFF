@@ -1,0 +1,15 @@
+--- a/007_universal/kod/p_355_ui_handlers.py
++++ b/007_universal/kod/p_355_ui_handlers.py
+@@ -53,4 +53,11 @@
+             speed=speed,
+             voice=voice_name
+         )
+-        return result.get('output_path')
++        
++        audio, sr = result.get('audio'), result.get('sample_rate')
++        
++        if audio is None or sr is None:
++            self.logger.error(f"TTS engine не повернув аудіодані для частини {idx}.")
++            return None
++
++        return self.ui_core._save_audio_part(idx, audio, sr)
