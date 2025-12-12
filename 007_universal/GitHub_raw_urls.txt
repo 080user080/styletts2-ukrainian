@@ -2,7 +2,7 @@
 RAG-Навігатор для ШІ
 ##########
 
-# Автоматично згенеровано: 2025-12-12 19:28:04
+# Автоматично згенеровано: 2025-12-12 19:55:26
 # Репозиторій: 080user080/styletts2-ukrainian
 # Гілка: main
 # Папка: 007_universal/kod
@@ -70,9 +70,6 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 [Advanced Ui Core] p_353_advanced_ui_core.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_advanced_ui_core.py
 
-[Tts Gradio Advanced Ui] p_353_tts_gradio_advanced_ui.py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_tts_gradio_advanced_ui.py
-
 [Ui Builder] p_354_ui_builder.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_354_ui_builder.py
 
@@ -84,6 +81,9 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 
 [Ui Utils] p_357_ui_utils.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_357_ui_utils.py
+
+[Tts Gradio Advanced Ui ] p_360_tts_gradio_advanced_ui_.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_360_tts_gradio_advanced_ui_.py
 
 [Test Integration] p_400_test_integration.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_400_test_integration.py
@@ -191,7 +191,7 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_312_tts_engine.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_312_tts_engine.py
 
-## UI - Користувацький інтерфейс (8 файлів)
+## UI - Користувацький інтерфейс (7 файлів)
 
 • Sfx Handler
   Файл: p_351_sfx_handler.py
@@ -204,10 +204,6 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 • Advanced Ui Core
   Файл: p_353_advanced_ui_core.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_advanced_ui_core.py
-
-• Tts Gradio Advanced Ui
-  Файл: p_353_tts_gradio_advanced_ui.py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_353_tts_gradio_advanced_ui.py
 
 • Ui Builder
   Файл: p_354_ui_builder.py
@@ -224,6 +220,12 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 • Ui Utils
   Файл: p_357_ui_utils.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_357_ui_utils.py
+
+## Група 36 (1 файлів)
+
+• Tts Gradio Advanced Ui 
+  Файл: p_360_tts_gradio_advanced_ui_.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_360_tts_gradio_advanced_ui_.py
 
 ## Група 40 (1 файлів)
 
@@ -265,7 +267,7 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 ##########
 
 Загальна кількість файлів: 29
-Дата генерації: 2025-12-12 19:28:04
+Дата генерації: 2025-12-12 19:55:26
 Репозиторій: 080user080/styletts2-ukrainian
 Гілка: main
 Папка: 007_universal/kod

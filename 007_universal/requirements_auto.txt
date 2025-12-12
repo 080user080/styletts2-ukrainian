@@ -1,5 +1,5 @@
 # Автоматично згенеровано UniversalDepsChecker
-# Загалом пакетів: 25
+# Загалом пакетів: 24
 
 ast
 colorama>=0.4.6
@@ -11,7 +11,6 @@ inspect
 ipa_uk
 kod
 numpy>=1.26.4
-platform>=1.0.8
 pydantic>=2.11.5
 scipy>=1.15.3
 shutil
