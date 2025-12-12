@@ -1,8 +1,8 @@
 # p_000_loader.py
 """
 Модуль P_000: ModuleLoader
-Тільки сканування, імпорт та ініціалізація модулів.
-Всі конфігурації обробляються окремими модулями.
+Сканування, імпорт та ініціалізація модулів.
+ВИПРАВЛЕНА ВЕРСІЯ: правильна обробка gr.Blocks об'єктів
 """
 
 import os
@@ -91,8 +91,47 @@ class ModuleLoader:
                 return func()
             except Exception as e:
                 INTERNAL_LOGGER.error(f"Помилка у {func_name}: {e}")
+                import traceback
+                traceback.print_exc()
                 return None
         return None
+    
+    def _process_initialize_result(self, result: Any, module_name: str) -> Dict[str, Any]:
+        """
+        Обробляє результат функції initialize().
+        
+        Може повертати:
+        1. gr.Blocks об'єкт (напряму) → зберігаємо як 'демо'
+        2. Dict з 'demo' всередині → витягаємо demo
+        3. Dict з іншими даними → зберігаємо як є
+        4. None → ігноруємо
+        """
+        if result is None:
+            return {}
+        
+        # Перевірка чи це gr.Blocks об'єкт
+        if hasattr(result, 'launch'):
+            # Це Gradio демо!
+            return {f"{module_name}_demo": result}
+        
+        # Якщо це dict
+        if isinstance(result, dict):
+            # Якщо всередині є 'demo' ключ
+            if 'demo' in result:
+                demo = result['demo']
+                
+                # Перевірка чи це gr.Blocks
+                if hasattr(demo, 'launch'):
+                    # Зберігаємо демо окремо
+                    result_copy = result.copy()
+                    result_copy[f"{module_name}_demo"] = demo
+                    return result_copy
+            
+            # Інші дані в dict - зберігаємо як є
+            return result
+        
+        # Для всіх інших типів даних
+        return {module_name: result}
     
     def run(self) -> Dict[str, Any]:
         """Головний цикл запуску."""
@@ -139,12 +178,26 @@ class ModuleLoader:
                     # Зберігаємо в ініціалізованих
                     self.initialized_modules.append(m.name)
                     
-                    # Додаємо результат у контекст
+                    # Обробляємо результат та зберігаємо в контекст
                     if result is not None:
-                        key_name = m.name.replace('p_', '')
-                        self.app_context[key_name] = result
+                        processed = self._process_initialize_result(result, m.name)
+                        
+                        if processed:
+                            self.app_context.update(processed)
+                            
+                            # Логування того, що було додано
+                            for key in processed.keys():
+                                if 'demo' in key.lower():
+                                    INTERNAL_LOGGER.info(f"  ✅ Демо зареєстровано: {key}")
             
             INTERNAL_LOGGER.info("--- СИСТЕМА ЗАПУЩЕНА ---")
+            
+            # Показуємо статус всіх демо
+            INTERNAL_LOGGER.info("Доступні демо:")
+            for key in sorted(self.app_context.keys()):
+                if 'demo' in key.lower() and hasattr(self.app_context[key], 'launch'):
+                    INTERNAL_LOGGER.info(f"  ✓ {key}")
+            
             return self.app_context
             
         except Exception as e:
