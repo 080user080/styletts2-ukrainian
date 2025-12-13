@@ -2,16 +2,19 @@
 RAG-Навігатор для ШІ
 ##########
 
-# Автоматично згенеровано: 2025-12-12 20:35:46
+# Автоматично згенеровано: 2025-12-13 16:41:10
 # Репозиторій: 080user080/styletts2-ukrainian
 # Гілка: main
 # Папка: 007_universal/kod
-# Знайдено файлів: 29
+# Знайдено файлів: 30
 
 1 RAG-Навігатор для ШІ
 Формат: Роль → RAW URL
 
 (Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)
+
+[0] 0.DIFF
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/0.DIFF
 
 [  Init  ] __init__.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/__init__.py
@@ -249,7 +252,11 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_996_gui_launcher.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_996_gui_launcher.py
 
-## Інші файли (2 файлів)
+## Інші файли (3 файлів)
+
+• 0
+  Файл: 0.DIFF
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/0.DIFF
 
 •   Init  
   Файл: __init__.py
@@ -264,8 +271,8 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 ІНФОРМАЦІЯ ПРО ГЕНЕРАЦІЮ
 ##########
 
-Загальна кількість файлів: 29
-Дата генерації: 2025-12-12 20:35:46
+Загальна кількість файлів: 30
+Дата генерації: 2025-12-13 16:41:10
 Репозиторій: 080user080/styletts2-ukrainian
 Гілка: main
 Папка: 007_universal/kod

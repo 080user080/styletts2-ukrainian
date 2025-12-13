@@ -14,8 +14,13 @@ def save_audio_part(audio: np.ndarray, sr: int, idx: int, output_dir: str) -> st
     else:
         audio = np.array(audio, dtype=np.float32)
     
-    # Збереження
-    part_path = os.path.join(output_dir, f"part_{idx:03d}.wav")
+    # Переконуємось, що директорія існує
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Генеруємо унікальне ім'я файлу
+    timestamp = int(time.time() * 1000)
+    part_path = os.path.join(output_dir, f"part_{idx:03d}_{timestamp}.wav")
+    
     try:
         sf.write(part_path, audio, sr)
         return part_path
@@ -38,13 +43,24 @@ def calculate_remaining_time(start_time: float, times_per_part: list, total_part
 
 def read_input_text(text_input: str, file_input: Optional[str]) -> str:
     """Читає текст з вводу або файлу."""
+    # Якщо є текст в полі вводу
     if text_input and text_input.strip():
         return text_input
-    elif file_input:
-        with open(file_input, 'r', encoding='utf-8') as f:
-            return f.read()
-    else:
-        raise ValueError("Введіть текст або виберіть файл")
+    
+    # Якщо вибрано файл
+    if file_input:
+        # Перевіряємо, чи це дійсний шлях до файлу
+        if isinstance(file_input, str) and os.path.exists(file_input):
+            try:
+                with open(file_input, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except UnicodeDecodeError:
+                # Fallback для інших кодувань
+                with open(file_input, 'r', encoding='cp1251') as f:
+                    return f.read()
+    
+    # Якщо нічого не введено
+    raise ValueError("Введіть текст в поле вводу або виберіть файл .txt")
 
 def create_output_directory() -> str:
     """Створює папку для виходу."""

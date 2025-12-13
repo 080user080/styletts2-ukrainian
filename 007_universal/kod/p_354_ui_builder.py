@@ -23,6 +23,8 @@ class AdvancedUIBuilder:
         self.available_voices = tts_engine.get_available_voices()
         self.available_sfx = sfx_handler.get_available_sfx_ids()
         self.output_dir = create_output_directory()
+        
+        self.logger.info(f"📂 Папка для збереження: {self.output_dir}")
     
     def build(self) -> gr.Blocks:
         """Будує весь інтерфейс."""
@@ -46,7 +48,7 @@ class AdvancedUIBuilder:
             btn_start, btn_export = self._add_buttons_section()
             
             # Прогрес
-            audio_output, part_slider, timer, remaining, progress_slider = self._add_progress_section()
+            audio_output, part_slider, timer, remaining, progress_slider, file_info = self._add_progress_section()
             
             # Довідка
             self._add_help_section()
@@ -55,20 +57,22 @@ class AdvancedUIBuilder:
             self._setup_event_handlers(
                 btn_start, btn_export, text_input, file_input,
                 voice_dropdowns, speed_sliders, save_option, ignore_speed_chk,
-                audio_output, part_slider, timer, remaining, progress_slider
+                audio_output, part_slider, timer, remaining, progress_slider, file_info
             )
         
         return demo
     
     def _add_header(self):
         """Додає заголовок."""
-        gr.Markdown("""
+        gr.Markdown(f"""
         # 🎙️ TTS Multi Dialog - Розширений режим
         
         **Введіть сценарій** з тегами або завантажте файл:
         - `#gN: текст` — озвучити голосом №N (1-30)
         - `#gN_fast` / `#gN_slow` — швидкість
         - `#sfx_bell` — звуковий ефект
+        
+        ⚠️ **Увага:** Оберіть файл .txt, а не директорію!
         """)
     
     def _add_input_section(self) -> Tuple[gr.Textbox, gr.File]:
@@ -78,10 +82,14 @@ class AdvancedUIBuilder:
                 text_input = gr.Textbox(
                     label="📋 Сценарій",
                     lines=10,
-                    placeholder="#g1: Привіт!\n#g2_fast: Як справи?"
+                    placeholder="#g1: Привіт!\n#g2_fast: Як справи?\n#sfx_bell"
                 )
             with gr.Column(scale=1):
-                file_input = gr.File(label="📂 Або файл .txt", type='filepath')
+                file_input = gr.File(
+                    label="📂 Або файл .txt", 
+                    type='filepath',
+                    file_types=['.txt']  # Обмежуємо тільки текстовими файлами
+                )
         
         return text_input, file_input
     
@@ -132,7 +140,7 @@ class AdvancedUIBuilder:
             save_option = gr.Radio(
                 ["Зберегти всі частини", "Без збереження"],
                 label="💾 Збереження",
-                value="Без збереження"
+                value="Без збереження"  # За замовчуванням не зберігаємо
             )
             ignore_speed_chk = gr.Checkbox(
                 label="⚡ Ігнорувати швидкість",
@@ -159,8 +167,9 @@ class AdvancedUIBuilder:
                 remaining = gr.Textbox(label="⏳ Залишилось", interactive=False)
             
             progress_slider = gr.Slider(label="📈 Прогрес", minimum=0, maximum=1, step=1, value=0, interactive=False)
+            file_info = gr.Textbox(label="📄 Статус", value="Готово до синтезу", interactive=False)
         
-        return audio_output, part_slider, timer, remaining, progress_slider
+        return audio_output, part_slider, timer, remaining, progress_slider, file_info
     
     def _add_help_section(self):
         """Додає довідку."""
@@ -173,11 +182,13 @@ class AdvancedUIBuilder:
             - `#gN_fast` - швидко (1.20)
             
             **Доступні SFX:** {sfx_list}
+            
+            **Увага:** При виборі файлу оберіть файл .txt, а не папку!
             """)
     
     def _setup_event_handlers(self, btn_start, btn_export, text_input, file_input,
                              voice_dropdowns, speed_sliders, save_option, ignore_speed_chk,
-                             audio_output, part_slider, timer, remaining, progress_slider):
+                             audio_output, part_slider, timer, remaining, progress_slider, file_info):
         """Налаштовує обробники."""
         all_inputs = [
             text_input, file_input,
@@ -192,7 +203,8 @@ class AdvancedUIBuilder:
             part_slider,
             timer,
             remaining,
-            progress_slider
+            progress_slider,
+            file_info
         ]
         
         btn_start.click(
