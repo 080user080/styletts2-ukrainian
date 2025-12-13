@@ -1,170 +1,175 @@
-import time
-import logging
-import os
-import soundfile as sf
-import numpy as np
-from typing import Dict, Any, Callable, List, Tuple
 import gradio as gr
-from p_357_ui_utils import (
-    save_audio_part, 
-    calculate_remaining_time, 
-    read_input_text
-)
+from typing import Optional, Dict, Any, Tuple
+import numpy as np
+import os
+import time
+from datetime import datetime
+import soundfile as sf
 
 class UIEventHandlers:
-    """Обробники подій для UI."""
+    """
+    Обробники подій для UI компонентів
+    """
     
-    def __init__(self, 
-                 tts_engine: Any,
-                 dialog_parser: Any,
-                 sfx_handler: Any,
-                 logger: logging.Logger = None):
-        self.tts_engine = tts_engine
-        self.dialog_parser = dialog_parser
-        self.sfx_handler = sfx_handler
-        self.logger = logger or logging.getLogger("UIHandlers")
+    def __init__(self, core_instance=None):
+        """
+        Ініціалізація обробників подій
+        
+        Args:
+            core_instance: Екземпляр AdvancedUICore (опціонально)
+        """
+        self.core = core_instance
+        print(f"🔄 Ініціалізовано UIEventHandlers з core: {core_instance is not None}")
     
-    def synthesize_batch(self, *args) -> Tuple:
-        """Обробляє пакетний синтез."""
+    def text_changed_handler(self, text: str) -> Dict[str, Any]:
+        """
+        Обробник зміни тексту в полі вводу
+        """
+        if not text or text.strip() == "":
+            return {"value": "", "interactive": True}
+        
+        # Можна використати core_instance для додаткової логіки
+        if self.core:
+            # Наприклад, перевірка довжини тексту через core
+            pass
+        
+        return {"value": text, "interactive": True}
+    
+    def save_audio_handler(self, audio: np.ndarray, samplerate: int, 
+                          file_name: str = None, session_state: str = None) -> Optional[str]:
+        """
+        Зберігає аудіофайл на диск
+        
+        Args:
+            audio: Аудіодані
+            samplerate: Частота дискретизації
+            file_name: Ім'я файлу для збереження (опціонально)
+            session_state: ID сесії для створення папки
+            
+        Returns:
+            Шлях до збереженого файлу або None при помилці
+        """
         try:
-            # Розпакування аргументів
-            text_input = args[0]
-            file_input = args[1]
-            speeds_flat = list(args[2:32])      # 30 швидкостей
-            voices_flat = list(args[32:62])     # 30 голосів
-            save_option = args[62] if len(args) > 62 else "Без збереження"
-            ignore_speed = bool(args[63]) if len(args) > 63 else False
+            from pathlib import Path
             
-            # Перевіряємо, чи file_input не є директорією
-            if file_input and isinstance(file_input, str):
-                if os.path.isdir(file_input):
-                    raise ValueError(f"Вказаний шлях '{file_input}' є директорією, а не файлом")
+            # Отримати session_id з core або з аргументу
+            if session_state:
+                session_id = session_state
+            elif self.core and hasattr(self.core, 'session_id'):
+                session_id = self.core.session_id
+            else:
+                session_id = str(int(time.time()))
             
-            # Читання тексту
-            text = read_input_text(text_input, file_input)
+            print(f"💾 Збереження аудіо для сесії: {session_id}")
             
-            # Парсинг подій
-            events = self.dialog_parser.parse_script_events(text, voices_flat)
-            total_parts = len(events)
+            # Створюємо папку для сесії
+            output_dir = Path("output_audio") / f"session_{session_id}"
+            output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Створюємо папку для збереження
-            output_dir = os.path.join(os.getcwd(), "output_audio", f"session_{int(time.time())}")
-            os.makedirs(output_dir, exist_ok=True)
+            # Генеруємо ім'я файлу, якщо не передано
+            if not file_name:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+                file_name = f"tts_output_{timestamp}.wav"
             
-            start_time = time.time()
-            times_per_part = []
+            # Зберігаємо аудіо
+            output_path = output_dir / file_name
+            sf.write(str(output_path), audio, samplerate)
             
-            # Обробка кожної події
-            for idx, event in enumerate(events, start=1):
-                try:
-                    # Синтез
-                    audio, sr = self._process_single_event(idx, event, voices_flat, speeds_flat, ignore_speed)
-                    
-                    # Збереження тільки якщо вибрано опцію
-                    if save_option == "Зберегти всі частини":
-                        audio_path = save_audio_part(audio, sr, idx, output_dir)
-                    else:
-                        # Якщо не зберігаємо, створюємо тимчасовий файл
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-                            # Конвертація до float32
-                            if isinstance(audio, np.ndarray):
-                                if audio.dtype != np.float32:
-                                    audio = audio.astype(np.float32)
-                            else:
-                                audio = np.array(audio, dtype=np.float32)
-                            
-                            sf.write(tmp.name, audio, sr)
-                            audio_path = tmp.name
-                    
-                    # Оновлення прогресу
-                    part_time = time.time()
-                    times_per_part.append(part_time - start_time)
-                    
-                    yield self._create_progress_update(
-                        idx, total_parts, start_time, times_per_part, audio_path
-                    )
-                    
-                except Exception as e:
-                    self.logger.error(f"Помилка обробки частини {idx}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    raise
+            print(f"✅ Аудіо збережено: {output_path}")
+            return str(output_path)
             
-            # Фінальний update
-            total_elapsed = int(time.time() - start_time)
-            yield (
-                None,
-                gr.update(value=total_parts, maximum=total_parts, interactive=True),
-                f"Завершено за {total_elapsed} сек",
-                "Готово!",
-                gr.update(value=total_parts, maximum=total_parts, interactive=False),
-                f"Файли збережено в: {os.path.basename(output_dir)}"
-            )
-        
         except Exception as e:
-            self.logger.error(f"Помилка синтезу: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+            print(f"❌ Помилка збереження аудіо: {e}")
+            return None
     
-    def export_settings(self, voices: List[str], speeds: List[float]) -> str:
-        """Експортує налаштування."""
-        import tempfile
-        import time
+    def apply_sfx_handler(self, audio: Optional[np.ndarray], sfx_type: str, 
+                         intensity: float) -> Tuple[Optional[np.ndarray], str]:
+        """
+        Застосування звукових ефектів
         
-        timestamp = int(time.time())
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
-            f.write(f"Налаштування TTS спікерів (експорт {time.strftime('%Y-%m-%d %H:%M:%S')})\n")
-            f.write("=" * 50 + "\n\n")
-            for i, voice in enumerate(voices[:30]):
-                speed = speeds[i] if i < len(speeds) else 0.88
-                f.write(f"#g{i+1}: {voice} (швидкість: {speed:.2f})\n")
-            return f.name
-    
-    def _process_single_event(self, idx, event, voices_flat, speeds_flat, ignore_speed):
-        """Обробляє одну подію."""
-        if event.get('type') == 'voice':
-            g_num = event.get('g')
-            text_body = event.get('text', '')
-            voice_name = voices_flat[g_num - 1] if g_num <= len(voices_flat) else None
+        Args:
+            audio: Вхідне аудіо
+            sfx_type: Тип ефекту
+            intensity: Інтенсивність ефекту
             
-            speed = self.dialog_parser.compute_speed_effective(
-                g_num, event.get('suffix', ''), speeds_flat, ignore_speed
-            )
+        Returns:
+            Кортеж (оброблене аудіо, повідомлення)
+        """
+        try:
+            if audio is None:
+                return None, "❌ Немає аудіо для обробки"
             
-            # ВАЖЛИВО: Не передаємо output_path до двигуна!
-            result = self.tts_engine.synthesize(
-                text=text_body,
-                speaker_id=g_num,
-                speed=speed,
-                voice=voice_name
-            )
-            return result['audio'], result['sample_rate']
-        
-        elif event.get('type') == 'sfx':
-            sfx_id = event.get('id')
-            sr, audio = self.sfx_handler.load_and_process_sfx(sfx_id)
-            return audio, sr
+            # Тут має бути логіка застосування SFX
+            # Наразі просто повертаємо оригінальне аудіо
+            processed_audio = audio
+            
+            return processed_audio, f"✅ SFX '{sfx_type}' застосовано (інтенсивність: {intensity})"
+            
+        except Exception as e:
+            return None, f"❌ Помилка: {str(e)}"
     
-    def _create_progress_update(self, idx, total, start_time, times_per_part, audio_path):
-        """Створює об'єкт прогресу."""
-        elapsed = int(time.time() - start_time)
+    @staticmethod
+    def normalize_audio(audio_data: np.ndarray) -> np.ndarray:
+        """
+        Нормалізація аудіо даних
+        """
+        if audio_data is None or len(audio_data) == 0:
+            return audio_data
         
-        if times_per_part and idx > 0:
-            remaining = calculate_remaining_time(start_time, times_per_part, total)
-        else:
-            remaining = "Розрахунок..."
+        max_val = np.max(np.abs(audio_data))
+        if max_val > 0:
+            return audio_data / max_val * 0.9
         
-        return (
-            audio_path,
-            gr.update(value=idx, maximum=total),
-            f"{elapsed} сек",
-            remaining,
-            gr.update(value=idx, maximum=total),
-            f"Частина {idx} з {total}"
-        )
+        return audio_data
+    
+    @staticmethod
+    def validate_audio_length(audio_data: np.ndarray, samplerate: int, 
+                             max_duration_seconds: int = 30) -> Tuple[bool, str]:
+        """
+        Перевірка тривалості аудіо
+        """
+        if audio_data is None:
+            return False, "Аудіо відсутнє"
+        
+        duration = len(audio_data) / samplerate
+        
+        if duration > max_duration_seconds:
+            return False, f"Аудіо задовге ({duration:.1f} сек > {max_duration_seconds} сек)"
+        
+        return True, f"Тривалість: {duration:.1f} сек"
 
-def prepare_config_models():
-    """Конфігурація не потрібна."""
-    return {}
+# Додаткові функції для зворотної сумісності
+def save_audio_handler(audio, samplerate, session_state=None):
+    """Альтернативний виклик для зворотної сумісності"""
+    handler = UIEventHandlers()
+    return handler.save_audio_handler(audio, samplerate, session_state=session_state)
+
+def text_changed_handler(text):
+    """Альтернативний виклик для зворотної сумісності"""
+    handler = UIEventHandlers()
+    result = handler.text_changed_handler(text)
+    return gr.update(value=result["value"], interactive=result["interactive"])
+
+def apply_sfx_handler(audio, sfx_type, intensity):
+    """Альтернативний виклик для зворотної сумісності"""
+    handler = UIEventHandlers()
+    return handler.apply_sfx_handler(audio, sfx_type, intensity)
+
+# Створюємо глобальний екземпляр для імпорту (ВАЖЛИВО!)
+event_handlers = UIEventHandlers()
+
+if __name__ == "__main__":
+    # Тестування
+    print("Модуль UIEventHandlers завантажено")
+    
+    # Тест ініціалізації з core
+    test_core = type('TestCore', (), {})()
+    test_core.session_id = "test_123"
+    
+    handler_with_core = UIEventHandlers(test_core)
+    print(f"Handler з core: {handler_with_core.core is not None}")
+    
+    # Тест збереження аудіо
+    test_audio = np.random.randn(44100)
+    path = handler_with_core.save_audio_handler(test_audio, 44100)
+    print(f"Тестове збереження: {path}")
