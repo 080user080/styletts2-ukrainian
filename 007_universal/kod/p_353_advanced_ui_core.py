@@ -29,12 +29,12 @@ def initialize(app_context: Dict[str, Any]) -> Optional[gr.Blocks]:
     
     try:
         # === 1. ПЕРЕВІРКА ЗАЛЕЖНОСТЕЙ ===
-        required_components = ['tts_engine', 'dialog_parser', 'sfx_handler']
+        required_components = ['tts_engine']
         missing = [comp for comp in required_components if comp not in app_context]
         
         if missing:
             logger.error(f"❌ Відсутні обов'язкові компоненти: {', '.join(missing)}")
-            logger.error("   Розширений UI потребує: tts_engine, dialog_parser, sfx_handler")
+            logger.error("   Розширений UI потребує: tts_engine")
             
             # Fallback: повертаємо простий інтерфейс
             demo = _create_fallback_interface(app_context, missing)
@@ -65,14 +65,23 @@ def initialize(app_context: Dict[str, Any]) -> Optional[gr.Blocks]:
         logger.info("🛠️  Побудова розширеного інтерфейсу...")
         
         try:
+            # Створюємо простий об'єкт ядра для UI
+            class SimpleCore:
+                def __init__(self):
+                    import time
+                    self.session_id = f"ui_{int(time.time())}"
+            
+            simple_core = SimpleCore()
+            
+            # Створюємо будівельник з правильними параметрами
             builder = AdvancedUIBuilder(
-                tts_engine=app_context['tts_engine'],
-                dialog_parser=app_context['dialog_parser'],
-                sfx_handler=app_context['sfx_handler'],
-                logger=logger
+                core_instance=simple_core,
+                config={},
+                tts_engine=app_context['tts_engine']
             )
             
-            demo = builder.build()
+            # Використовуємо існуючий метод create_advanced_ui
+            demo = builder.create_advanced_ui(core_instance=simple_core)
             
             if not demo:
                 raise RuntimeError("Builder повернув None")
@@ -94,7 +103,7 @@ def initialize(app_context: Dict[str, Any]) -> Optional[gr.Blocks]:
         app_context['tts_gradio_advanced_demo'] = demo
         app_context['advanced_ui_initialized'] = True
         
-        logger.info("✅ Розширений UI ядро успішно ініціалізовано на порту 7862")
+        logger.info("✅ Розширений UI ядро успішно ініціалізовано")
         
         # === 5. ПОВЕРНЕННЯ РЕЗУЛЬТАТУ ===
         # ВАЖЛИВО: Лаунчер очікує gr.Blocks, а не Dict!

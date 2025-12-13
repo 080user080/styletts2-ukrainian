@@ -2,25 +2,19 @@
 RAG-Навігатор для ШІ
 ##########
 
-# Автоматично згенеровано: 2025-12-13 17:30:29
+# Автоматично згенеровано: 2025-12-13 18:36:29
 # Репозиторій: 080user080/styletts2-ukrainian
 # Гілка: main
 # Папка: 007_universal/kod
-# Знайдено файлів: 31
+# Знайдено файлів: 30
 
 1 RAG-Навігатор для ШІ
 Формат: Роль → RAW URL
 
 (Готово до використання в моделі 'динамічного RAG', коли ШІ завантажує тільки запитані файли.)
 
-[0] 0.DIFF
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/0.DIFF
-
 [  Init  ] __init__.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/__init__.py
-
-[ P 360 Tts Gradio Advanced Ui (Mono)] _p_360_tts_gradio_advanced_ui_(mono).py
-https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_p_360_tts_gradio_advanced_ui_(mono).py
 
 [Loader] p_000_loader.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_000_loader.py
@@ -90,6 +84,9 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 
 [Ui Utils] p_357_ui_utils.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_357_ui_utils.py
+
+[Tts Gradio Advanced Ui (Mono)] p_360_tts_gradio_advanced_ui_(mono).py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_360_tts_gradio_advanced_ui_(mono).py
 
 [Test Integration] p_400_test_integration.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_400_test_integration.py
@@ -231,6 +228,12 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_357_ui_utils.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_357_ui_utils.py
 
+## Група 36 (1 файлів)
+
+• Tts Gradio Advanced Ui (Mono)
+  Файл: p_360_tts_gradio_advanced_ui_(mono).py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_360_tts_gradio_advanced_ui_(mono).py
+
 ## Група 40 (1 файлів)
 
 • Test Integration
@@ -259,27 +262,19 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_996_gui_launcher.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_996_gui_launcher.py
 
-## Інші файли (3 файлів)
-
-• 0
-  Файл: 0.DIFF
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/0.DIFF
+## Інші файли (1 файлів)
 
 •   Init  
   Файл: __init__.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/__init__.py
-
-•  P 360 Tts Gradio Advanced Ui (Mono)
-  Файл: _p_360_tts_gradio_advanced_ui_(mono).py
-  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/_p_360_tts_gradio_advanced_ui_(mono).py
 
 
 ##########
 ІНФОРМАЦІЯ ПРО ГЕНЕРАЦІЮ
 ##########
 
-Загальна кількість файлів: 31
-Дата генерації: 2025-12-13 17:30:29
+Загальна кількість файлів: 30
+Дата генерації: 2025-12-13 18:36:29
 Репозиторій: 080user080/styletts2-ukrainian
 Гілка: main
 Папка: 007_universal/kod

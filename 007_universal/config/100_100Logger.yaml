@@ -1,9 +1,0 @@
-# Конфігурація модуля: p_100_logger
-# Автоматично згенеровано з p_100_logger.py
-# Змінюйте цей файл для налаштувань
----
-
-logging:
-  file: logs/app.log
-  level: INFO
-  rotation_size_mb: 1

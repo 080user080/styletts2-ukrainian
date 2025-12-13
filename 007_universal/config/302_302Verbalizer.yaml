@@ -1,9 +1,0 @@
-# Конфігурація модуля: p_302_verbalizer
-# Автоматично згенеровано з p_302_verbalizer.py
-# Змінюйте цей файл для налаштувань
----
-
-verbalizer:
-  device: auto
-  enabled: true
-  model_name: skypro1111/mbart-large-50-verbalization

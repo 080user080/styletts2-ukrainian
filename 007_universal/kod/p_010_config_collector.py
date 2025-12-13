@@ -1,4 +1,4 @@
-# p_001_config_collector.py
+# p_010_config_collector.py
 """
 Модуль збирання конфігурацій.
 Збирає DEFAULT_CONFIG з Python файлів БЕЗ їх імпорту, через аналіз коду.
@@ -23,25 +23,7 @@ class ConfigSource:
 
 class ConfigCollector:
     """Збирач конфігурацій."""
-        # В клас ConfigCollector додати:
-    def create_main_config(self):
-        """Створити основний config.yaml з базовими налаштуваннями."""
-        base_config = {
-            'app': {
-                'name': 'Мій Модульний Проєкт',
-                'version': '1.0.0',
-                'mode': 'DEBUG'
-            },
-            'note': 'Цей файл має найвищий пріоритет. Редагуйте його для налаштувань.'
-        }
-        
-        with open(self.config_filepath, 'w', encoding='utf-8') as f:
-            yaml.dump(base_config, f, 
-                      default_flow_style=False, 
-                      allow_unicode=True, 
-                      indent=2)
-        
-        self.logger.info(f"Створено основний конфігураційний файл: {self.config_filepath}")
+    
     def __init__(self, app_context: Dict[str, Any]):
         self.app_context = app_context
         self.logger = logging.getLogger("ConfigCollector")
@@ -61,6 +43,25 @@ class ConfigCollector:
         
         # Зберігаємо джерела конфігурації
         self.config_sources: List[ConfigSource] = []
+    
+    def create_main_config(self):
+        """Створити основний config.yaml з базовими налаштуваннями."""
+        base_config = {
+            'app': {
+                'name': 'Мій Модульний Проєкт',
+                'version': '1.0.0',
+                'mode': 'DEBUG'
+            },
+            'note': 'Цей файл має найвищий пріоритет. Редагуйте його для налаштувань.'
+        }
+        
+        with open(self.config_filepath, 'w', encoding='utf-8') as f:
+            yaml.dump(base_config, f, 
+                      default_flow_style=False, 
+                      allow_unicode=True, 
+                      indent=2)
+        
+        self.logger.info(f"Створено основний конфігураційний файл: {self.config_filepath}")
     
     def extract_default_config_from_file(self, filepath: Path) -> Tuple[str, Dict[str, Any]]:
         """
@@ -371,72 +372,75 @@ class ConfigCollector:
                 d[keys[0]] = {}
             self._set_nested_value(d[keys[0]], keys[1:], value)
     
-def save_config_summary(self, config: Dict[str, Any]):
-    """Зберігає зведення конфігурації."""
-    summary_path = self.config_dir / "_config_summary.yaml"
-    
-    try:
-        summary = {
-            'total_sources': len(self.config_sources),
-            'total_sections': len(config),
-            'config_sources': [
-                {
-                    'key': s.key,
-                    'source': s.source,
-                    'priority': s.priority,
-                    'value': s.value
-                }
-                for s in sorted(self.config_sources, key=lambda x: x.key)[:50]
-            ],
-            'sections': list(config.keys())
-        }
+    def save_config_summary(self, config: Dict[str, Any]):
+        """Зберігає зведення конфігурації."""
+        summary_path = self.config_dir / "_config_summary.yaml"
         
-        with open(summary_path, 'w', encoding='utf-8') as f:
-            yaml.dump(summary, f, 
-                     default_flow_style=False, 
-                     sort_keys=True, 
-                     allow_unicode=True, 
-                     indent=2)
-        
-        self.logger.info(f"📋 Зведення конфігурації збережено: {summary_path.name}")
-        
-        # === НОВИЙ КОД: ОЧИЩЕННЯ СТАРИХ ФАЙЛІВ ===
-        self._cleanup_old_reports()
-        
-    except Exception as e:
-        self.logger.error(f"Помилка збереження зведення: {e}")
+        try:
+            summary = {
+                'total_sources': len(self.config_sources),
+                'total_sections': len(config),
+                'config_sources': [
+                    {
+                        'key': s.key,
+                        'source': s.source,
+                        'priority': s.priority,
+                        'value': s.value
+                    }
+                    for s in sorted(self.config_sources, key=lambda x: x.key)[:50]
+                ],
+                'sections': list(config.keys())
+            }
+            
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                yaml.dump(summary, f, 
+                         default_flow_style=False, 
+                         sort_keys=True, 
+                         allow_unicode=True, 
+                         indent=2)
+            
+            self.logger.info(f"📋 Зведення конфігурації збережено: {summary_path.name}")
+            
+            # Очищення старих файлів
+            self._cleanup_old_reports()
+            
+        except Exception as e:
+            self.logger.error(f"Помилка збереження зведення: {e}")
 
-def _cleanup_old_reports(self):
-    """Очищує старі файли конфігураційних звітів."""
-    try:
-        report_dir = self.config_dir
-        if not report_dir.exists():
-            return
+    def _cleanup_old_reports(self):
+        """Очищує старі файли конфігураційних звітів."""
+        try:
+            report_dir = self.config_dir
+            if not report_dir.exists():
+                return
+            
+            # Отримуємо всі .yaml файли (крім файлів що починаються з _)
+            yaml_files = [
+                f for f in report_dir.glob("*.yaml")
+                if not f.name.startswith('_')
+            ]
+            
+            if len(yaml_files) <= 2:  # Максимум 2 файли
+                return
+            
+            # Сортуємо за часом модифікації (найстарші першими)
+            yaml_files.sort(key=lambda f: f.stat().st_mtime)
+            
+            # Видаляємо старі файли, зберігаючи останні 2
+            deleted_count = 0
+            for old_file in yaml_files[:-2]:
+                try:
+                    old_file.unlink()
+                    self.logger.debug(f"🗑️  Видалено старий звіт: {old_file.name}")
+                    deleted_count += 1
+                except Exception as e:
+                    self.logger.warning(f"⚠️  Не вдалося видалити {old_file.name}: {e}")
+            
+            if deleted_count > 0:
+                self.logger.info(f"✅ Видалено {deleted_count} старих файлів конфігурації")
         
-        # Отримуємо всі .yaml файли (крім _config_summary.yaml та інших що починаються з _)
-        yaml_files = [
-            f for f in report_dir.glob("*.yaml")
-            if not f.name.startswith('_')
-        ]
-        
-        if len(yaml_files) <= 2:  # Максимум 2 файли
-            return
-        
-        # Сортуємо за часом модифікації (найстарші першими)
-        yaml_files.sort(key=lambda f: f.stat().st_mtime)
-        
-        # Видаляємо старі файли, зберігаючи останні 2
-        for old_file in yaml_files[:-2]:
-            try:
-                old_file.unlink()
-                self.logger.debug(f"🗑️  Видалено старий звіт: {old_file.name}")
-            except Exception as e:
-                self.logger.warning(f"⚠️  Не вдалося видалити {old_file.name}: {e}")
-    
-    except Exception as e:
-        self.logger.debug(f"Помилка очищення старих звітів: {e}")
-
-
+        except Exception as e:
+            self.logger.debug(f"Помилка очищення старих звітів: {e}")
 
 def prepare_config_models():
     """Повертає модель конфігурації для збирача конфігів."""

@@ -16,6 +16,10 @@ config_sources:
   source: module:p_310_tts_config
   value: 1200
 - key: dialog_parser.char_cap
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: 1200
+- key: dialog_parser.char_cap
   priority: 100
   source: user:config.yaml
   value: 1200
@@ -24,6 +28,10 @@ config_sources:
   source: module:p_310_tts_config
   value: true
 - key: dialog_parser.enabled
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: true
+- key: dialog_parser.enabled
   priority: 100
   source: user:config.yaml
   value: true
@@ -32,6 +40,10 @@ config_sources:
   source: module:p_310_tts_config
   value: 280
 - key: dialog_parser.max_tokens
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: 280
+- key: dialog_parser.max_tokens
   priority: 100
   source: user:config.yaml
   value: 280
@@ -40,6 +52,10 @@ config_sources:
   source: module:p_310_tts_config
   value: 480
 - key: dialog_parser.plbert_safe
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: 480
+- key: dialog_parser.plbert_safe
   priority: 100
   source: user:config.yaml
   value: 480
@@ -48,12 +64,20 @@ config_sources:
   source: module:p_310_tts_config
   value: 30
 - key: dialog_parser.speaker_max
+  priority: 690
+  source: file:310_310TtsConfig.yaml
+  value: 30
+- key: dialog_parser.speaker_max
   priority: 100
   source: user:config.yaml
   value: 30
 - key: error_handler.enabled
   priority: 1000
   source: module:p_060_error_handler
+  value: true
+- key: error_handler.enabled
+  priority: 500
+  source: file:060_060ErrorHandler.yaml
   value: true
 - key: error_handler.enabled
   priority: 940
@@ -66,6 +90,10 @@ config_sources:
 - key: error_handler.log_errors
   priority: 1000
   source: module:p_060_error_handler
+  value: true
+- key: error_handler.log_errors
+  priority: 500
+  source: file:060_060ErrorHandler.yaml
   value: true
 - key: error_handler.log_errors
   priority: 940
@@ -78,6 +106,10 @@ config_sources:
 - key: error_handler.max_error_length
   priority: 1000
   source: module:p_060_error_handler
+  value: 1000
+- key: error_handler.max_error_length
+  priority: 500
+  source: file:060_060ErrorHandler.yaml
   value: 1000
 - key: error_handler.max_error_length
   priority: 940
@@ -90,6 +122,10 @@ config_sources:
 - key: error_handler.retry_count
   priority: 1000
   source: module:p_060_error_handler
+  value: 0
+- key: error_handler.retry_count
+  priority: 500
+  source: file:060_060ErrorHandler.yaml
   value: 0
 - key: error_handler.retry_count
   priority: 940
@@ -102,6 +138,10 @@ config_sources:
 - key: error_handler.skip_failed_modules
   priority: 1000
   source: module:p_060_error_handler
+  value: true
+- key: error_handler.skip_failed_modules
+  priority: 500
+  source: file:060_060ErrorHandler.yaml
   value: true
 - key: error_handler.skip_failed_modules
   priority: 940
@@ -116,6 +156,10 @@ config_sources:
   source: module:p_075_events
   value: true
 - key: events.enabled
+  priority: 500
+  source: file:075_075Events.yaml
+  value: true
+- key: events.enabled
   priority: 925
   source: file:075_075Events.yaml
   value: true
@@ -128,6 +172,10 @@ config_sources:
   source: module:p_075_events
   value: INFO
 - key: events.log_level
+  priority: 500
+  source: file:075_075Events.yaml
+  value: INFO
+- key: events.log_level
   priority: 925
   source: file:075_075Events.yaml
   value: INFO
@@ -136,69 +184,21 @@ config_sources:
   source: user:config.yaml
   value: INFO
 - key: gradio_main.analytics_enabled
-  priority: 695
-  source: file:305_305TtsGradioMain.yaml
-  value: false
-- key: gradio_main.analytics_enabled
   priority: 100
   source: user:config.yaml
   value: false
-- key: gradio_main.enabled
-  priority: 695
-  source: file:305_305TtsGradioMain.yaml
-  value: true
 - key: gradio_main.enabled
   priority: 100
   source: user:config.yaml
   value: true
 - key: gradio_main.port
-  priority: 695
-  source: file:305_305TtsGradioMain.yaml
-  value: 7860
-- key: gradio_main.port
   priority: 100
   source: user:config.yaml
   value: 7860
 - key: gradio_main.server_name
-  priority: 695
-  source: file:305_305TtsGradioMain.yaml
-  value: 0.0.0.0
-- key: gradio_main.server_name
   priority: 100
   source: user:config.yaml
   value: 0.0.0.0
-- key: gradio_main.share
-  priority: 695
-  source: file:305_305TtsGradioMain.yaml
-  value: false
-- key: gradio_main.share
-  priority: 100
-  source: user:config.yaml
-  value: false
-- key: gradio_ui.analytics_enabled
-  priority: 1000
-  source: module:p_310_tts_config
-  value: false
-- key: gradio_ui.analytics_enabled
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: false
-- key: gradio_ui.analytics_enabled
-  priority: 100
-  source: user:config.yaml
-  value: false
-- key: gradio_ui.height
-  priority: 1000
-  source: module:p_310_tts_config
-  value: 600
-- key: gradio_ui.height
-  priority: 690
-  source: file:310_310TtsConfig.yaml
-  value: 600
-- key: gradio_ui.height
-  priority: 100
-  source: user:config.yaml
-  value: 600
 sections:
 - app
 - dialog_parser
@@ -217,4 +217,4 @@ sections:
 - universal_deps_checker
 - verbalizer
 total_sections: 16
-total_sources: 210
+total_sources: 234

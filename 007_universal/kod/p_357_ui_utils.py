@@ -71,3 +71,31 @@ def create_output_directory() -> str:
 def prepare_config_models():
     """Конфігурація не потрібна."""
     return {}
+
+class UIUtils:
+    """Клас утиліт для UI компонентів."""
+    
+    @staticmethod
+    def save_audio_part(audio: np.ndarray, sr: int, idx: int, output_dir: str) -> str:
+        """Зберігає аудіо частину в файл."""
+        return save_audio_part(audio, sr, idx, output_dir)
+    
+    @staticmethod
+    def calculate_remaining_time(start_time: float, times_per_part: list, total_parts: int) -> str:
+        """Розраховує залишений час."""
+        return calculate_remaining_time(start_time, times_per_part, total_parts)
+    
+    @staticmethod
+    def read_input_text(text_input: str, file_input: Optional[str]) -> str:
+        """Читає текст з вводу або файлу."""
+        return read_input_text(text_input, file_input)
+    
+    @staticmethod
+    def create_output_directory() -> str:
+        """Створює папку для виходу."""
+        return create_output_directory()
+    
+    @staticmethod
+    def prepare_config_models():
+        """Конфігурація не потрібна."""
+        return {}

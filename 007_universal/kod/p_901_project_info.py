@@ -1,4 +1,4 @@
-# p_900_project_info.py
+# p_901_project_info.py
 """
 Модуль для документування проекту.
 Збирає інформацію про всі модулі, конфігурації, залежності та взаємодії.
@@ -28,7 +28,7 @@ class ProjectInfoCollector:
         self.dependencies: Dict[str, Set[str]] = {}
         self.config_sections: Set[str] = set()
         self.components: Dict[str, str] = {}
-        
+    
     def analyze_module(self, filepath: Path) -> Dict[str, Any]:
         """Аналізує модуль та повертає детальну інформацію."""
         info = {
@@ -441,73 +441,71 @@ class ProjectInfoCollector:
             }
         }
     
-def save_all_reports(self):
-    """Зберігає всі звіти у файли."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # Генеруємо звіти
-    full_doc = self.generate_full_documentation()
-    detailed = self.generate_detailed_report()
-    
-    # Зберігаємо у папку project_info з timestamp (архів)
-    archive_files = {
-        'full_documentation': (self.output_dir / f"documentation_{timestamp}.md", full_doc),
-        'detailed': (self.output_dir / f"detailed_{timestamp}.txt", detailed)
-    }
-    
-    for name, (path, content) in archive_files.items():
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(content)
-    
-    # Зберігаємо у корінь проекту (постійні файли, які завжди оновлюються)
-    main_doc_path = self.project_root / "PROJECT_DOCUMENTATION.md"
-    with open(main_doc_path, 'w', encoding='utf-8') as f:
-        f.write(full_doc)
-    
-    self.logger.info("📄 Документація оновлена:")
-    self.logger.info(f"   └─ {main_doc_path.name} (головний файл)")
-    self.logger.info(f"   └─ Архів: {self.output_dir}/documentation_{timestamp}.md")
-    
-    # === НОВИЙ КОД: ОЧИЩЕННЯ СТАРИХ ФАЙЛІВ ===
-    self._cleanup_old_project_reports()
-
-def _cleanup_old_project_reports(self):
-    """Очищує старі файли проектної документації."""
-    try:
-        if not self.output_dir.exists():
-            return
+    def save_all_reports(self):
+        """Зберігає всі звіти у файли."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Отримуємо всі .md та .txt файли (крім _README.md)
-        report_files = [
-            f for f in self.output_dir.glob("*.*")
-            if f.is_file() and 
-               f.suffix in ['.md', '.txt'] and
-               not f.name.startswith('_')
-        ]
+        # Генеруємо звіти
+        full_doc = self.generate_full_documentation()
+        detailed = self.generate_detailed_report()
         
-        if len(report_files) <= 4:  # Максимум 4 файли
-            return
+        # Зберігаємо у папку project_info з timestamp (архів)
+        archive_files = {
+            'full_documentation': (self.output_dir / f"documentation_{timestamp}.md", full_doc),
+            'detailed': (self.output_dir / f"detailed_{timestamp}.txt", detailed)
+        }
         
-        # Сортуємо за часом модифікації (найстарші першими)
-        report_files.sort(key=lambda f: f.stat().st_mtime)
+        for name, (path, content) in archive_files.items():
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
         
-        # Видаляємо старі файли, зберігаючи останні 4
-        deleted_count = 0
-        for old_file in report_files[:-4]:
-            try:
-                old_file.unlink()
-                self.logger.debug(f"🗑️  Видалено стара документація: {old_file.name}")
-                deleted_count += 1
-            except Exception as e:
-                self.logger.warning(f"⚠️  Не вдалося видалити {old_file.name}: {e}")
+        # Зберігаємо у корінь проекту (постійні файли, які завжди оновлюються)
+        main_doc_path = self.project_root / "PROJECT_DOCUMENTATION.md"
+        with open(main_doc_path, 'w', encoding='utf-8') as f:
+            f.write(full_doc)
         
-        if deleted_count > 0:
-            self.logger.info(f"✅ Видалено {deleted_count} старих файлів документації")
+        self.logger.info("📄 Документація оновлена:")
+        self.logger.info(f"   └─ {main_doc_path.name} (головний файл)")
+        self.logger.info(f"   └─ Архів: {self.output_dir}/documentation_{timestamp}.md")
+        
+        # Очищення старих файлів
+        self._cleanup_old_project_reports()
     
-    except Exception as e:
-        self.logger.debug(f"Помилка очищення старих звітів: {e}")
-
-
+    def _cleanup_old_project_reports(self):
+        """Очищує старі файли проектної документації."""
+        try:
+            if not self.output_dir.exists():
+                return
+            
+            # Отримуємо всі .md та .txt файли (крім _README.md)
+            report_files = [
+                f for f in self.output_dir.glob("*.*")
+                if f.is_file() and 
+                   f.suffix in ['.md', '.txt'] and
+                   not f.name.startswith('_')
+            ]
+            
+            if len(report_files) <= 4:  # Максимум 4 файли
+                return
+            
+            # Сортуємо за часом модифікації (найстарші першими)
+            report_files.sort(key=lambda f: f.stat().st_mtime)
+            
+            # Видаляємо старі файли, зберігаючи останні 4
+            deleted_count = 0
+            for old_file in report_files[:-4]:
+                try:
+                    old_file.unlink()
+                    self.logger.debug(f"🗑️  Видалено стара документація: {old_file.name}")
+                    deleted_count += 1
+                except Exception as e:
+                    self.logger.warning(f"⚠️  Не вдалося видалити {old_file.name}: {e}")
+            
+            if deleted_count > 0:
+                self.logger.info(f"✅ Видалено {deleted_count} старих файлів документації")
+        
+        except Exception as e:
+            self.logger.debug(f"Помилка очищення старих звітів: {e}")
     
     def run(self):
         """Запускає повний аналіз проекту."""

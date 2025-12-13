@@ -1,9 +1,0 @@
-# Конфігурація модуля: p_080_registry
-# Автоматично згенеровано з p_080_registry.py
-# Змінюйте цей файл для налаштувань
----
-
-registry:
-  allow_overwrite: false
-  enabled: true
-  validate_callbacks: true
