@@ -39,17 +39,33 @@ def main():
         with gr.Tabs():
             with gr.TabItem('Multi Dialog'):
                 
-                # Створити всі компоненти UI
-                (text_input, file_input,
-                 voice_components, speed_components,
-                 btn_start, save_option, ignore_speed_chk,
-                 output_audio, part_slider, autoplay_chk,
-                 timer_text, start_time_text, end_time_text, est_end_time_text,
-                 remaining_time_text, parts_progress,
-                 accordion_refs,
-                 save_buttons_inner, save_buttons_top) = create_multi_dialog_tab(prompts_list)
+                # Створити всі компоненти UI (повертає словник)
+                ui = create_multi_dialog_tab(prompts_list)
                 
-                # Налаштувати обробники зміни тексту (автовидимість спікерів)
+                # Розпакувати словник
+                text_input = ui['text_input']
+                file_input = ui['file_input']
+                voice_components = ui['voice_components']
+                speed_components = ui['speed_components']
+                btn_start = ui['btn_start']
+                save_option = ui['save_option']
+                ignore_speed_chk = ui['ignore_speed_chk']
+                output_audio = ui['output_audio']
+                part_slider = ui['part_slider']
+                autoplay_chk = ui['autoplay_chk']
+                timer_text = ui['timer_text']
+                start_time_text = ui['start_time_text']
+                end_time_text = ui['end_time_text']
+                est_end_time_text = ui['est_end_time_text']
+                remaining_time_text = ui['remaining_time_text']
+                parts_progress = ui['parts_progress']
+                accordion_refs = ui['accordion_refs']
+                save_buttons = ui['save_buttons']
+                
+                # Розпакувати кнопки
+                save_download_btn, save_default_btn, load_btn = save_buttons
+                
+                # Налаштувати обробники текстових змін (автовидимість акордеонів)
                 setup_text_change_handlers(
                     text_input, file_input,
                     voice_components, speed_components,
@@ -74,17 +90,16 @@ def main():
                     'est_end_time_text': est_end_time_text,
                     'remaining_time_text': remaining_time_text,
                     'parts_progress': parts_progress,
-                    'save_buttons_inner': save_buttons_inner,
-                    'save_buttons_top': save_buttons_top,
+                    'save_buttons': (save_download_btn, save_default_btn, load_btn),
                 }
                 
-                # Реєструвати всі обробники подій
                 # Передати pipeline_func з OUTPUT_DIR в замиканні
                 def pipeline_with_output_dir(text_input, file_input, speeds, voices, save_opt, ignore_speed):
                     return batch_synthesize_dialog_events(
                         text_input, file_input, speeds, voices, save_opt, ignore_speed, OUTPUT_DIR
                     )
                 
+                # Реєструвати всі обробники подій
                 register_all_events(
                     ui_components,
                     pipeline_with_output_dir,

@@ -44,11 +44,7 @@ def register_all_events(
     est_end_time_text = ui_components['est_end_time_text']
     remaining_time_text = ui_components['remaining_time_text']
     parts_progress = ui_components['parts_progress']
-    save_buttons_inner = ui_components['save_buttons_inner']
-    save_buttons_top = ui_components['save_buttons_top']
-    
-    save_download_btn_inner, save_default_btn_inner, load_btn_inner = save_buttons_inner
-    save_download_btn_top, save_default_btn_top, load_btn_top = save_buttons_top
+    save_download_btn, save_default_btn, load_btn = ui_components['save_buttons']
     
     # ===== 1) Кнопка запуску =====
     btn_inputs = (
@@ -79,26 +75,16 @@ def register_all_events(
     # ===== 2) Експорт налаштувань (Download) =====
     export_handler = create_export_settings_handler(output_dir)
     
-    save_download_btn_inner.click(
+    save_download_btn.click(
         fn=export_handler,
         inputs=voice_components + speed_components,
-        outputs=save_download_btn_inner,
-    )
-    save_download_btn_top.click(
-        fn=export_handler,
-        inputs=voice_components + speed_components,
-        outputs=save_download_btn_top,
+        outputs=save_download_btn,
     )
     
     # ===== 3) Збереження у папку за замовчуванням =====
     save_default_handler = create_save_to_default_handler(output_dir)
     
-    save_default_btn_inner.click(
-        fn=save_default_handler,
-        inputs=voice_components + speed_components,
-        outputs=[],
-    )
-    save_default_btn_top.click(
+    save_default_btn.click(
         fn=save_default_handler,
         inputs=voice_components + speed_components,
         outputs=[],
@@ -107,14 +93,9 @@ def register_all_events(
     # ===== 4) Завантаження налаштувань =====
     load_handler = create_load_settings_handler()
     
-    load_btn_inner.upload(
+    load_btn.upload(
         fn=load_handler,
-        inputs=[load_btn_inner] + voice_components + speed_components,
-        outputs=voice_components + speed_components,
-    )
-    load_btn_top.upload(
-        fn=load_handler,
-        inputs=[load_btn_top] + voice_components + speed_components,
+        inputs=[load_btn] + voice_components + speed_components,
         outputs=voice_components + speed_components,
     )
     
