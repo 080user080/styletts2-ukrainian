@@ -2,11 +2,11 @@
 RAG-Навігатор для ШІ
 ##########
 
-# Автоматично згенеровано: 2025-12-13 17:18:48
+# Автоматично згенеровано: 2025-12-13 17:30:29
 # Репозиторій: 080user080/styletts2-ukrainian
 # Гілка: main
 # Папка: 007_universal/kod
-# Знайдено файлів: 30
+# Знайдено файлів: 31
 
 1 RAG-Навігатор для ШІ
 Формат: Роль → RAW URL
@@ -30,6 +30,9 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 
 [Config Updater] p_012_config_updater.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_012_config_updater.py
+
+[Report Cleaner] p_013_report_cleaner.py
+https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_013_report_cleaner.py
 
 [Config Tool] p_015_config_tool.py
 https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_015_config_tool.py
@@ -118,7 +121,7 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
   Файл: p_000_loader.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_000_loader.py
 
-## Config - Конфігурація (3 файлів)
+## Config - Конфігурація (4 файлів)
 
 • Config Collector
   Файл: p_010_config_collector.py
@@ -127,6 +130,10 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 • Config Updater
   Файл: p_012_config_updater.py
   RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_012_config_updater.py
+
+• Report Cleaner
+  Файл: p_013_report_cleaner.py
+  RAW: https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_universal/kod/p_013_report_cleaner.py
 
 • Config Tool
   Файл: p_015_config_tool.py
@@ -271,8 +278,8 @@ https://raw.githubusercontent.com/080user080/styletts2-ukrainian/main/007_univer
 ІНФОРМАЦІЯ ПРО ГЕНЕРАЦІЮ
 ##########
 
-Загальна кількість файлів: 30
-Дата генерації: 2025-12-13 17:18:48
+Загальна кількість файлів: 31
+Дата генерації: 2025-12-13 17:30:29
 Репозиторій: 080user080/styletts2-ukrainian
 Гілка: main
 Папка: 007_universal/kod

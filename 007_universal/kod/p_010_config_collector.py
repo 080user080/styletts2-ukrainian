@@ -371,37 +371,72 @@ class ConfigCollector:
                 d[keys[0]] = {}
             self._set_nested_value(d[keys[0]], keys[1:], value)
     
-    def save_config_summary(self, config: Dict[str, Any]):
-        """Зберігає зведення конфігурації."""
-        summary_path = self.config_dir / "_config_summary.yaml"
+def save_config_summary(self, config: Dict[str, Any]):
+    """Зберігає зведення конфігурації."""
+    summary_path = self.config_dir / "_config_summary.yaml"
+    
+    try:
+        summary = {
+            'total_sources': len(self.config_sources),
+            'total_sections': len(config),
+            'config_sources': [
+                {
+                    'key': s.key,
+                    'source': s.source,
+                    'priority': s.priority,
+                    'value': s.value
+                }
+                for s in sorted(self.config_sources, key=lambda x: x.key)[:50]
+            ],
+            'sections': list(config.keys())
+        }
         
-        try:
-            summary = {
-                'total_sources': len(self.config_sources),
-                'total_sections': len(config),
-                'config_sources': [
-                    {
-                        'key': s.key,
-                        'source': s.source,
-                        'priority': s.priority,
-                        'value': s.value
-                    }
-                    for s in sorted(self.config_sources, key=lambda x: x.key)[:50]  # Обмежуємо для читабельності
-                ],
-                'sections': list(config.keys())
-            }
-            
-            with open(summary_path, 'w', encoding='utf-8') as f:
-                yaml.dump(summary, f, 
-                         default_flow_style=False, 
-                         sort_keys=True, 
-                         allow_unicode=True, 
-                         indent=2)
-            
-            self.logger.info(f"📋 Зведення конфігурації збережено: {summary_path.name}")
-            
-        except Exception as e:
-            self.logger.error(f"Помилка збереження зведення: {e}")
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            yaml.dump(summary, f, 
+                     default_flow_style=False, 
+                     sort_keys=True, 
+                     allow_unicode=True, 
+                     indent=2)
+        
+        self.logger.info(f"📋 Зведення конфігурації збережено: {summary_path.name}")
+        
+        # === НОВИЙ КОД: ОЧИЩЕННЯ СТАРИХ ФАЙЛІВ ===
+        self._cleanup_old_reports()
+        
+    except Exception as e:
+        self.logger.error(f"Помилка збереження зведення: {e}")
+
+def _cleanup_old_reports(self):
+    """Очищує старі файли конфігураційних звітів."""
+    try:
+        report_dir = self.config_dir
+        if not report_dir.exists():
+            return
+        
+        # Отримуємо всі .yaml файли (крім _config_summary.yaml та інших що починаються з _)
+        yaml_files = [
+            f for f in report_dir.glob("*.yaml")
+            if not f.name.startswith('_')
+        ]
+        
+        if len(yaml_files) <= 2:  # Максимум 2 файли
+            return
+        
+        # Сортуємо за часом модифікації (найстарші першими)
+        yaml_files.sort(key=lambda f: f.stat().st_mtime)
+        
+        # Видаляємо старі файли, зберігаючи останні 2
+        for old_file in yaml_files[:-2]:
+            try:
+                old_file.unlink()
+                self.logger.debug(f"🗑️  Видалено старий звіт: {old_file.name}")
+            except Exception as e:
+                self.logger.warning(f"⚠️  Не вдалося видалити {old_file.name}: {e}")
+    
+    except Exception as e:
+        self.logger.debug(f"Помилка очищення старих звітів: {e}")
+
+
 
 def prepare_config_models():
     """Повертає модель конфігурації для збирача конфігів."""
