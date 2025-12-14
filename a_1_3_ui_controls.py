@@ -21,15 +21,18 @@ def create_controls_block() -> Tuple[gr.Button, gr.Radio, gr.Checkbox]:
     btn_start = gr.Button('▶ Розпочати')
     
     with gr.Accordion("Опції збереження", open=False):
+        # Елемент 1: Опції збереження (gr.Radio)
         save_option = gr.Radio(
             choices=SAVE_CHOICES,
             label='Опції збереження',
             value=SAVE_CHOICES[1]
         )
-    
-    ignore_speed_chk = gr.Checkbox(
-        label='Ігнорувати швидкість',
-        value=False
-    )
+        
+        # Елемент 2: Ігнорувати швидкість (gr.Checkbox)
+        # Тепер він коректно знаходиться всередині Accordion (спойлера)
+        ignore_speed_chk = gr.Checkbox(
+            label='Ігнорувати швидкість',
+            value=False
+        ) # <-- Додано закриваючу дужку
     
     return btn_start, save_option, ignore_speed_chk
