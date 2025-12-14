@@ -41,13 +41,8 @@ def _synthesize_chunk(chunk: str, voice: str | None, speed: float) -> Tuple[int,
     
     # Перевірити розмір, потім спробувати синтез
     parts: List[str] = [chunk]
-    tok_count = _tok_len(chunk)
-    
-    # Більш агресивне початкове розбиття для довгих текстів
-    if tok_count > PLBERT_SAFE or len(chunk) > CHAR_CAP:
-        # Використовуємо менший розмір одразу
-        parts = split_to_parts(chunk, max_tokens=HARD_MAX_TOKENS)
-        print(f"Розбито на {len(parts)} частин (початковий токен-лік: {tok_count})")
+    if _tok_len(chunk) > PLBERT_SAFE or len(chunk) > CHAR_CAP:
+        parts = split_to_parts(chunk, max_tokens=min(HARD_MAX_TOKENS, PLBERT_SAFE // 2))
     
     try:
         return run_for_parts(parts)
@@ -55,17 +50,9 @@ def _synthesize_chunk(chunk: str, voice: str | None, speed: float) -> Tuple[int,
         first_err = traceback.format_exc()
         if _needs_plbert_fallback(first_err):
             try:
-                # Ще більш агресивне розбиття
-                fallback_tokens = max(100, HARD_MAX_TOKENS // 2)
-                fallback_parts = split_to_parts(chunk, max_tokens=fallback_tokens)
-                print(f"Fallback: розбито на {len(fallback_parts)} частин (макс токенів: {fallback_tokens})")
+                # Агресивнішою розбиття
+                fallback_parts = split_to_parts(chunk, max_tokens=PLBERT_SAFE // 3)
                 return run_for_parts(fallback_parts)
             except Exception:
-                # Останній шанс - розбити на дуже малі частини
-                try:
-                    emergency_parts = split_to_parts(chunk, max_tokens=80)
-                    print(f"Emergency fallback: розбито на {len(emergency_parts)} частин (макс токенів: 80)")
-                    return run_for_parts(emergency_parts)
-                except Exception:
-                    raise RuntimeError(f"Synthesis error навіть після emergency fallback:\n{traceback.format_exc()}") from None
+                raise RuntimeError(f"Synthesis error:\n{traceback.format_exc()}") from None
         raise RuntimeError(f"Synthesis error:\n{first_err}") from None

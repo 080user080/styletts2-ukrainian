@@ -11,11 +11,11 @@ try:
 except Exception:
     AutoTokenizer = None
 
-# Ліміти безпеки - ЗМЕНШЕНІ для уникнення помилок
-CHAR_CAP = 800         # зменшено з 1200
-HARD_MAX_TOKENS = 200  # зменшено з 280
+# Ліміти безпеки
+CHAR_CAP = 1200        # жорстка стеля по символах для одного шматка
+HARD_MAX_TOKENS = 280  # цільовий бюджет токенів на шматок
 PLBERT_MAX = 512
-PLBERT_SAFE = 400      # зменшено з 480
+PLBERT_SAFE = 480      # запас безпеки перед 512
 
 _tok = None
 if AutoTokenizer is not None:
@@ -70,7 +70,7 @@ def _split_sentence_safe(sent: str, max_tokens: int) -> list[str]:
             if len(buf) == 1:
                 chunk = tok
                 while _tok_len(chunk) > max_tokens:
-                    cut = max(32, int(len(chunk) * 0.5))  # більш агресивна обрізка
+                    cut = max(64, int(len(chunk) * 0.7))
                     parts.append(chunk[:cut])
                     chunk = chunk[cut:]
                 buf = [chunk]
@@ -89,21 +89,8 @@ def _split_sentence_safe(sent: str, max_tokens: int) -> list[str]:
             continue
         frag = chunk
         while len(frag) > 0 and (_tok_len(frag) > max_tokens or len(frag) > CHAR_CAP):
-            # Шукаємо розділювачі (кома, крапка з комою, двокрапка)
-            m = re.search(r'(.{100,}?[,;:])\s+', frag, flags=re.DOTALL)
-            if m:
-                cut = m.end()
-            else:
-                # Якщо не знайдено розділювач, ріжемо по пробілах
-                words = frag.split()
-                cut_pos = 0
-                temp = ""
-                for w in words:
-                    if _tok_len(temp + " " + w) > max_tokens or len(temp + " " + w) > CHAR_CAP:
-                        break
-                    temp = (temp + " " + w).strip()
-                    cut_pos = len(temp)
-                cut = max(cut_pos, min(len(frag), 200))
+            m = re.search(r'(.{200,}?[,;:])\s+', frag, flags=re.DOTALL)
+            cut = m.end() if m else min(len(frag), max(300, len(frag) // 2))
             safe.append(frag[:cut].strip())
             frag = frag[cut:].lstrip()
         if frag:
@@ -113,7 +100,7 @@ def _split_sentence_safe(sent: str, max_tokens: int) -> list[str]:
 
 def split_to_parts(text: str, max_tokens: int = HARD_MAX_TOKENS) -> list[str]:
     """
-    Розбиває текст на шматки ≤~200 токенів і ≤800 символів.
+    Розбиває текст на шматки ≤~280 токенів і ≤1200 символів.
     Поважає абзаци й речення, зберігає '+'.
     """
     text = normalize_text(text)
