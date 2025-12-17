@@ -37,9 +37,9 @@ def get_accordion_visibility(max_speaker: int) -> dict:
     Діапазони:
       - acc_1_3:   g1-g3    → видимий якщо max_speaker >= 1
       - acc_4_12:  g4-g12   → видимий якщо max_speaker >= 4
+      - acc_more:  батько   → видимий якщо max_speaker >= 13 (тому що всередині g13+)
       - acc_13_21: g13-g21  → видимий якщо max_speaker >= 13
       - acc_22_30: g22-g30  → видимий якщо max_speaker >= 22
-      - acc_more:  батько для додаткових → видимий якщо max_speaker >= 13
     
     Parameters:
         max_speaker: максимальний номер спікера (1-30)
@@ -48,21 +48,21 @@ def get_accordion_visibility(max_speaker: int) -> dict:
         dict: {"acc_name": visible_bool, ...}
     
     Приклад:
-        max_speaker=4 →
+        max_speaker=14 →
         {
             "acc_1_3": True,      # g1-g3 існує
-            "acc_4_12": True,     # g4-g12 існує, бо max=4
-            "acc_13_21": False,
+            "acc_4_12": True,     # g4-g12 існує
+            "acc_more": True,     # батько видимий, тому що всередині g13+
+            "acc_13_21": True,    # g13-g21 існує, бо max=14
             "acc_22_30": False,
-            "acc_more": False
         }
     """
     return {
         "acc_1_3": max_speaker >= 1,
         "acc_4_12": max_speaker >= 4,
-        "acc_13_21": max_speaker >= 13,
+        "acc_more": max_speaker >= 13,      # Батько для додаткових — видимий якщо є g13+
+        "acc_13_21": max_speaker >= 13,    # Вложений акордеон
         "acc_22_30": max_speaker >= 22,
-        "acc_more": max_speaker >= 13,
     }
 
 

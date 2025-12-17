@@ -159,19 +159,33 @@ def _get_accordion_updates(max_speaker: int, accordion_refs: list) -> list:
     Повертає оновлення для акордеонів на основі максимального спікера.
     
     accordion_refs порядок: [acc_1_3, acc_4_12, acc_13_21, acc_22_30, acc_more]
+    
+    ВАЖЛИВО: При розпаковуванні в a_1_ui_main, порядок:
+      [0] acc_1_3
+      [1] acc_4_12
+      [2] acc_13_21
+      [3] acc_22_30
+      [4] acc_more
+    
+    Але у get_accordion_visibility() поверталися: acc_1_3, acc_4_12, acc_more, acc_13_21, acc_22_30
+    Тому потрібно переупорядкувати!
     """
     visibility = get_accordion_visibility(max_speaker)
     
+    # Розпакуємо у правильному порядку для accordion_refs
     updates = [
         gr.update(visible=visibility["acc_1_3"]),     # [0] acc_1_3
         gr.update(visible=visibility["acc_4_12"]),    # [1] acc_4_12
-        gr.update(visible=visibility["acc_13_21"]),   # [2] acc_13_21
-        gr.update(visible=visibility["acc_22_30"]),   # [3] acc_22_30
-        gr.update(visible=visibility["acc_more"]),    # [4] acc_more
+        gr.update(visible=visibility["acc_13_21"]),   # [2] acc_13_21 (вложений)
+        gr.update(visible=visibility["acc_22_30"]),   # [3] acc_22_30 (вложений)
+        gr.update(visible=visibility["acc_more"]),    # [4] acc_more (батько)
     ]
     
-    print(f"DEBUG: accordion visibility updates: acc_1_3={visibility['acc_1_3']}, "
-          f"acc_4_12={visibility['acc_4_12']}, acc_13_21={visibility['acc_13_21']}, "
-          f"acc_22_30={visibility['acc_22_30']}, acc_more={visibility['acc_more']}")
+    print(f"DEBUG: accordion visibility updates: "
+          f"acc_1_3={visibility['acc_1_3']}, "
+          f"acc_4_12={visibility['acc_4_12']}, "
+          f"acc_13_21={visibility['acc_13_21']}, "
+          f"acc_22_30={visibility['acc_22_30']}, "
+          f"acc_more={visibility['acc_more']}")
     
     return updates

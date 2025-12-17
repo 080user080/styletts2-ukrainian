@@ -44,9 +44,12 @@ def create_export_settings_handler(output_dir: str) -> Callable:
     """
     Обробник експорту налаштувань голосів у файл для завантаження.
     
+    Створює файл в тимчасовій папці та пропонує користувачу його завантажити.
+    Користувач може вибрати куди його зберегти через системний діалог браузера.
+    
     Returns:
         Функція, що приймає (voice_components..., speed_components...)
-        і повертає шлях до файлу
+        і повертає шлях до файлу для завантаження
     """
     def handler(*flat_values):
         """
@@ -55,10 +58,11 @@ def create_export_settings_handler(output_dir: str) -> Callable:
         voices = list(flat_values[:30])
         speeds = list(flat_values[30:60])
         
+        # Створити тимчасовий файл
         export_root = os.path.join(output_dir, "_exports")
         os.makedirs(export_root, exist_ok=True)
         
-        fname = f"speakers_settings_{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.txt"
+        fname = f"speakers_settings_{time.strftime('%Y%m%d_%H%M%S')}.txt"
         out_path = os.path.abspath(os.path.join(export_root, fname))
         
         lines = []
@@ -75,6 +79,10 @@ def create_export_settings_handler(output_dir: str) -> Callable:
         
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(text)
+        
+        # Gradio автоматично пропонує завантажити через системний діалог
+        print(f"✅ Файл створено: {out_path}")
+        print(f"📥 Браузер запропонує вам завантажити файл в папку за вибором")
         
         return out_path
     
