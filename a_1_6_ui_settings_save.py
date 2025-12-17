@@ -4,37 +4,25 @@ UI блок: збереження / завантаження налаштува�
 """
 
 import gradio as gr
-from typing import Tuple
 
 
-def create_settings_save_block() -> Tuple:
+def create_settings_save_block():
     """
     Створює блок з кнопками для експорту / імпорту налаштувань.
     
-    Returns:
-        (save_download_btn, save_default_btn, load_btn)
+    Returns три окремих компоненти (NOT tuple of tuple):
+        save_download_btn, save_default_btn, load_btn
     """
-    with gr.Accordion("Опції збереження", open=False):
-        save_download_btn = gr.DownloadButton("💾 Зберегти налаштування мовців")
-        with gr.Row():
-            save_default_btn = gr.Button("📁 Зберегти у папку за замовчуванням")
-            load_btn = gr.UploadButton(
-                "📂 Завантажити налаштування (.txt)",
-                file_types=[".txt"],
-                file_count="single"
-            )
-    
-    # Повернені кнопки (видимі зверху)
     with gr.Row():
-        save_download_btn_top = gr.DownloadButton("💾 Зберегти налаштування мовців")
-        save_default_btn_top = gr.Button("📁 Зберегти у папку за замовчуванням")
-        load_btn_top = gr.UploadButton(
+        save_download_btn = gr.DownloadButton(
+            "💾 Завантажити налаштування (.txt)"
+        )
+        save_default_btn = gr.Button("📁 Зберегти в папку за замовчуванням")
+        load_btn = gr.UploadButton(
             "📂 Завантажити налаштування (.txt)",
             file_types=[".txt"],
             file_count="single"
         )
     
-    return (
-        (save_download_btn, save_default_btn, load_btn),
-        (save_download_btn_top, save_default_btn_top, load_btn_top)
-    )
+    # Повертаємо як три окремих значення, а не кортеж
+    return save_download_btn, save_default_btn, load_btn
