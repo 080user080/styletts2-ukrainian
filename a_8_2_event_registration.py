@@ -44,7 +44,9 @@ def register_all_events(
     est_end_time_text = ui_components['est_end_time_text']
     remaining_time_text = ui_components['remaining_time_text']
     parts_progress = ui_components['parts_progress']
-    save_download_btn, save_default_btn, load_btn = ui_components['save_buttons']
+    
+    # ВАЖЛИВО: тепер save_buttons має 4 елементи
+    save_download_btn, save_download_file, save_default_btn, load_btn = ui_components['save_buttons']
     
     # ===== 1) Кнопка запуску =====
     btn_inputs = (
@@ -72,13 +74,13 @@ def register_all_events(
         show_progress=False
     )
     
-    # ===== 2) Експорт налаштувань (Download) =====
+    # ===== 2) Експорт налаштувань =====
     export_handler = create_export_settings_handler(output_dir)
     
     save_download_btn.click(
         fn=export_handler,
         inputs=voice_components + speed_components,
-        outputs=save_download_btn,
+        outputs=[save_download_file],  # Оновлює File компонент
     )
     
     # ===== 3) Збереження у папку за замовчуванням =====

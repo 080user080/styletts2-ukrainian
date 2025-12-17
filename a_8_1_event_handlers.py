@@ -19,7 +19,7 @@ def create_btn_start_handler(pipeline_func: Callable) -> Callable:
         pipeline_func: функція батч_синтезу (з a_8_pipeline)
     
     Returns:
-        Функція-обробник для click-события кнопки
+        Функція-обробник для click-події кнопки
     """
     def handler(text_input, file_input, *flat_values):
         # Перезавантажити конфіг sfx.yaml
@@ -44,12 +44,12 @@ def create_export_settings_handler(output_dir: str) -> Callable:
     """
     Обробник експорту налаштувань голосів у файл для завантаження.
     
-    Створює файл в тимчасовій папці та пропонує користувачу його завантажити.
-    Користувач може вибрати куди його зберегти через системний діалог браузера.
+    Створює файл і повертає його для відображення у gr.File компоненті,
+    звідки користувач може завантажити файл.
     
     Returns:
         Функція, що приймає (voice_components..., speed_components...)
-        і повертає шлях до файлу для завантаження
+        і повертає (файл для File компонента, повідомлення)
     """
     def handler(*flat_values):
         """
@@ -80,11 +80,10 @@ def create_export_settings_handler(output_dir: str) -> Callable:
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(text)
         
-        # Gradio автоматично пропонує завантажити через системний діалог
         print(f"✅ Файл створено: {out_path}")
-        print(f"📥 Браузер запропонує вам завантажити файл в папку за вибором")
         
-        return out_path
+        # Повернути файл для gr.File компонента
+        return gr.update(value=out_path, visible=True)
     
     return handler
 

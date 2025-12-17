@@ -62,8 +62,8 @@ def main():
                 accordion_refs = ui['accordion_refs']
                 save_buttons = ui['save_buttons']
                 
-                # Розпакувати кнопки
-                save_download_btn, save_default_btn, load_btn = save_buttons
+                # ВАЖЛИВО: тепер save_buttons має 4 елементи
+                save_download_btn, save_download_file, save_default_btn, load_btn = save_buttons
                 
                 # Налаштувати обробники текстових змін (автовидимість акордеонів)
                 setup_text_change_handlers(
@@ -90,7 +90,7 @@ def main():
                     'est_end_time_text': est_end_time_text,
                     'remaining_time_text': remaining_time_text,
                     'parts_progress': parts_progress,
-                    'save_buttons': (save_download_btn, save_default_btn, load_btn),
+                    'save_buttons': (save_download_btn, save_download_file, save_default_btn, load_btn),
                 }
                 
                 # Передати pipeline_func з OUTPUT_DIR в замиканні
@@ -106,7 +106,7 @@ def main():
                     OUTPUT_DIR
                 )
     
-    # Запустити интерфейс
+    # Запустити інтерфейс
     demo.queue().launch()
 
 
