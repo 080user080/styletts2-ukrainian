@@ -1,39 +1,55 @@
-
-from transformers import MBartForConditionalGeneration, AutoTokenizer
-
-verbalizer_model_name = "skypro1111/mbart-large-50-verbalization"
+import os
+import time
+import ctranslate2
+from transformers import M2M100Tokenizer
+from huggingface_hub import snapshot_download
 
 
 class Verbalizer():
-    def __init__(self, device):
-        self.device = device
+    MODEL_PATH = os.getenv("MODEL_PATH", "skypro1111/m2m100-ukr-verbalization-ct2")
+    TOKENIZER_PATH = os.getenv("TOKENIZER_PATH", "skypro1111/m2m100-ukr-verbalization")
+    def __init__(self):
+        
+        print("\nInitializing CTranslate2 model and tokenizer...")
 
-        self.model = MBartForConditionalGeneration.from_pretrained(verbalizer_model_name,
-            low_cpu_mem_usage=True,
-            device_map=device,
-        )
-        self.model.eval()
     
-        self.tokenizer = AutoTokenizer.from_pretrained(verbalizer_model_name)
-        self.tokenizer.src_lang = "uk_XX"
-        self.tokenizer.tgt_lang = "uk_XX"
-    
-    def generate_text(self, text):
-        """Generate text for a single input."""
-        # Prepare input
-        input_text = "<verbalization>:" + text
-
-        encoded_input = self.tokenizer(
-            input_text,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=1024,
-        ).to(self.device)
-        output_ids = self.model.generate(
-            **encoded_input, max_length=1024, num_beams=5, early_stopping=True
+        # Download the model from HuggingFace Hub
+        local_model_path = snapshot_download(
+            repo_id=self.MODEL_PATH,
+            allow_patterns=["*.bin", "*.json", "tokenizer.json", "vocab.json"],
         )
-        normalized_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        
+        self.translator = ctranslate2.Translator(
+            local_model_path,
+            device='cpu',
+            compute_type="int8",
+        )
+        
+        # Load tokenizer
+        self.tokenizer = M2M100Tokenizer.from_pretrained(self.TOKENIZER_PATH)
+        self.tokenizer.src_lang = "uk"
+        
+    def process_text(self, text: str):
+        """Process a single text input using the CTranslate2 model."""
+        start_time = time.time()
+        
+        # Tokenize input
+        source = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(text))
+        target_prefix = [self.tokenizer.lang_code_to_token["uk"]]
+        
+        # Run inference
+        results = self.translator.translate_batch(
+            [source],
+            target_prefix=[target_prefix],
+            beam_size=1,
+            num_hypotheses=1,
+            use_vmap=True,
+        )
+        
+        # Get target tokens and decode
+        target = results[0].hypotheses[0][1:]  # Remove language token
+        output = self.tokenizer.decode(self.tokenizer.convert_tokens_to_ids(target))
+        
+        inference_time = time.time() - start_time
+        return output, inference_time
 
-
-        return normalized_text.strip()
